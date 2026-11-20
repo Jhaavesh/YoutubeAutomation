@@ -1,0 +1,37 @@
+# OAuth & Secret Credentials (NEVER COMMIT)
+client_secret.json
+token.pickle
+auth_link.txt
+archive/
+
+# Local Autopilot Database & Runtime State
+autopilot_db.json
+*.log
+
+# Video Outputs & Temporary Media Files
+daily_generated/
+GTA6_Shorts/
+*.mp4
+*.mkv
+*.webm
+*.avi
+*.part
+*.jpg
+*.jpeg
+*.png
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# Editor Settings & OS Junk
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
