@@ -47,7 +47,8 @@ YoutubeAutomation/
 ├── assets/
 │   └── audio/
 │       └── phonk_1.mp3          # Copyright-free Phonk background music
-├── auto_pilot_bot.py            # Main automation engine & scheduler
+├── auto_pilot_bot.py            # Main automation engine & scheduler (Shorts)
+├── long_video_engine.py         # 16:9 Long-Form Video Automation Engine
 ├── upload_video.py              # YouTube Data API v3 upload & scheduling module
 ├── setup_auth.py                # OAuth 2.0 authorization server & token generator
 ├── run_daily.bat                # Windows batch launcher
