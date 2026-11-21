@@ -7,6 +7,13 @@ import shutil
 import subprocess
 import urllib.request
 from datetime import datetime, timedelta
+
+# Ensure UTF-8 output encoding on Windows so emojis never crash print() in redirected logs
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import yt_dlp
 from upload_video import upload_short
 
