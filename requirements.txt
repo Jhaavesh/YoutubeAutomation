@@ -1,6 +1,19 @@
+# Core YouTube API
 google-api-python-client>=2.202.0
 google-auth-httplib2>=0.4.4
 google-auth-oauthlib>=1.5.0
+
+# Video downloading
 yt-dlp>=2026.10.26
+
+# FFmpeg wrapper (optional, we use system FFmpeg)
 imageio-ffmpeg>=0.8.1
+
+# HTTP requests
 requests>=2.34.2
+
+# Configuration
+PyYAML>=6.0.1
+
+# Optional: For health check script
+# psutil>=5.9.0  # Uncomment if you want disk usage in health_check without shutil

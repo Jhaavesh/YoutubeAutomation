@@ -7,6 +7,19 @@ archive/
 # Local Autopilot Database & Runtime State
 autopilot_db.json
 *.log
+last_run_health.*
+autopilot_boot.log
+autopilot_errors.log
+
+# Configuration (may contain local paths)
+config.yaml
+
+# Local backups and runtime ledgers (never commit)
+backups/
+upload_ledger.json
+.env
+secrets.local.json
+.dashboard_token
 
 # Video Outputs & Temporary Media Files
 daily_generated/
@@ -35,3 +48,8 @@ venv/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# IDE/Editor specific
+*.swp
+*.swo
+*~
