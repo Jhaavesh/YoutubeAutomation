@@ -43,6 +43,34 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_AUDIO = os.path.join(BASE_DIR, 'assets', 'audio')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'daily_generated')
 DB_FILE = os.path.join(BASE_DIR, 'autopilot_db.json')
+LOCK_FILE = os.path.join(BASE_DIR, 'autopilot.lock')
+
+def acquire_lock():
+    """Prevents concurrent executions from creating duplicate uploads."""
+    if os.path.exists(LOCK_FILE):
+        try:
+            with open(LOCK_FILE, 'r') as f:
+                pid = int(f.read().strip())
+            cmd = f'tasklist /FI "PID eq {pid}"'
+            out = subprocess.check_output(cmd, shell=True).decode()
+            if str(pid) in out and "python" in out.lower():
+                print(f"[Lock] Another autopilot instance (PID {pid}) is already running! Exiting to prevent duplicate uploads.")
+                return False
+        except Exception:
+            pass
+    try:
+        with open(LOCK_FILE, 'w') as f:
+            f.write(str(os.getpid()))
+        return True
+    except Exception:
+        return True
+
+def release_lock():
+    if os.path.exists(LOCK_FILE):
+        try:
+            os.remove(LOCK_FILE)
+        except Exception:
+            pass
 
 FFMPEG_EXE = r"C:\Users\Awesh\AppData\Local\Programs\Python\Python312\Scripts\ffmpeg.exe"
 if not os.path.exists(FFMPEG_EXE):
@@ -399,28 +427,34 @@ def run_master_autopilot():
     print("      (1 Long 4K Video + 4 High-Action Shorts / Day)      ")
     print("==========================================================")
 
-    cleanup_old_storage(max_age_hours=24)
-
-    if not wait_for_internet():
-        print("Aborting: Internet connection not detected.")
+    if not acquire_lock():
         return
 
-    db = load_db()
-    today_key = datetime.now().strftime("%Y-%m-%d")
+    try:
+        cleanup_old_storage(max_age_hours=24)
 
-    # Step 1: Ensure today's 16:9 Long Video is created & scheduled
-    long_video_info = execute_daily_long_video(db, today_key)
+        if not wait_for_internet():
+            print("Aborting: Internet connection not detected.")
+            return
 
-    # Step 2: Ensure today's 4 Shorts are created, scheduled & linked
-    execute_daily_shorts(db, today_key, long_video_info)
+        db = load_db()
+        today_key = datetime.now().strftime("%Y-%m-%d")
 
-    cleanup_old_storage(max_age_hours=24)
+        # Step 1: Ensure today's 16:9 Long Video is created & scheduled
+        long_video_info = execute_daily_long_video(db, today_key)
 
-    print("\n==========================================================")
-    print("  DAILY AUTOPILOT BUNDLE COMPLETE (1 LONG + 4 SHORTS)!    ")
-    print("  All videos are safely scheduled on YouTube's servers.   ")
-    print("  You can now safely shut down or use your laptop.        ")
-    print("==========================================================\n")
+        # Step 2: Ensure today's 4 Shorts are created, scheduled & linked
+        execute_daily_shorts(db, today_key, long_video_info)
+
+        cleanup_old_storage(max_age_hours=24)
+
+        print("\n==========================================================")
+        print("  DAILY AUTOPILOT BUNDLE COMPLETE (1 LONG + 4 SHORTS)!    ")
+        print("  All videos are safely scheduled on YouTube's servers.   ")
+        print("  You can now safely shut down or use your laptop.        ")
+        print("==========================================================\n")
+    finally:
+        release_lock()
 
 if __name__ == '__main__':
     run_master_autopilot()
