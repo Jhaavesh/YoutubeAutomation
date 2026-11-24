@@ -2,8 +2,8 @@
 DON OF VICE CITY — MASTER AUTOPILOT (Refactored)
 =================================================
 Orchestrates daily content production:
-- 1 Long Video (16:9 1440p 60FPS) scheduled for 6:00 PM IST
-- 4 Shorts (9:16 Vertical 60FPS) scheduled at peak times
+- 1 Long Video (16:9 1440p, configured FPS) scheduled at the configured time
+- 4 Shorts (9:16 Vertical, configured FPS) scheduled at the configured slots
 
 Features:
 - Multi-channel support via config.yaml
@@ -40,7 +40,7 @@ def run_master_autopilot(channel_key: Optional[str] = None) -> Dict[str, Any]:
     """
     log.info("=" * 60)
     log.info("  DON OF VICE CITY — MASTER AUTOPILOT LAUNCHER")
-    log.info("  (1 Long 4K Video + 4 High-Action Shorts / Day)")
+    log.info("  (1 Long 1440p Video + Shorts / Day)")
     log.info("=" * 60)
 
     cfg = get_config()
@@ -59,47 +59,53 @@ def run_master_autopilot(channel_key: Optional[str] = None) -> Dict[str, Any]:
 
     # Print quota report
     report = get_quota_report()
-    log.info(f"Quota Status: {report['used']}/{report['limit']} used ({report['percent_used']}%)")
-    if not report['is_safe']:
-        log.warning("⚠️ Quota usage above alert threshold!")
+    log.info(
+        "Quota Status: %s/%s units used (%s%%); uploads %s/%s",
+        report["used"],
+        report["limit"],
+        report["percent_used"],
+        report["uploads"],
+        report["upload_limit"],
+    )
+    if not report["is_safe"]:
+        log.warning("Quota usage is above the configured alert threshold.")
 
     # ========================================================================
     # STEP 1: DAILY LONG VIDEO
     # ========================================================================
     log.info("\n" + "-" * 60)
-    log.info("  [STEP 1] DAILY 16:9 4K/1440p LONG VIDEO AUTOMATION")
+    log.info("  [STEP 1] DAILY 16:9 1440p LONG VIDEO AUTOMATION")
     log.info("-" * 60)
 
     long_video_info = None
+    long_error = None
     if today_key in db.get("daily_long_videos", {}):
         existing = db["daily_long_videos"][today_key]
-        log.info(f"Today's Long Video already scheduled: {existing['url']}")
+        log.info(f"Today's Long Video already scheduled: {existing.get('url')}")
         long_video_info = existing
     else:
         try:
             long_video_info = build_and_publish_daily_long_video(channel_key)
-            # Reload DB to get updated state
             db = load_db()
             long_video_info = db["daily_long_videos"].get(today_key, long_video_info)
         except Exception as e:
+            long_error = str(e)
             log.exception(f"Long video generation failed: {e}")
-            # Continue with shorts even if long video fails
-            long_video_info = {
-                'url': f'https://www.youtube.com/@{cfg.default_channel}',
-                'title': 'GTA 6 4K Ultra Gameplay'
-            }
+            # Shorts can still run, but the overall run must report failure.
 
     # ========================================================================
     # STEP 2: DAILY SHORTS (with cross-promotion)
     # ========================================================================
     log.info("\n" + "-" * 60)
-    log.info("  [STEP 2] DAILY 4 SHORTS AUTOMATION (WITH 4K LINK)")
+    log.info("  [STEP 2] DAILY SHORTS AUTOMATION (WITH 1440p LINK)")
     log.info("-" * 60)
 
     shorts_results = []
+    shorts_error = None
     try:
         shorts_results = run_daily_shorts(channel_key, long_video_info)
     except Exception as e:
+        shorts_error = str(e)
         log.exception(f"Shorts generation failed: {e}")
 
     # ========================================================================
@@ -107,25 +113,57 @@ def run_master_autopilot(channel_key: Optional[str] = None) -> Dict[str, Any]:
     # ========================================================================
     cleanup_old_files(cfg.get_output_path())
 
-    # Final quota report
+    # Re-read the DB so "already scheduled" slots count as success.
+    db = load_db()
+    scheduled_today = db.get("scheduled_slots", {}).get(today_key, [])
+    expected_shorts = len(cfg.schedule.shorts_standard_slots)
+
+    long_ok = long_video_info is not None
+    shorts_ok = len(scheduled_today) >= expected_shorts
+    success = long_ok and shorts_ok
+
     final_report = get_quota_report()
-    log.info(f"\nFinal Quota: {final_report['used']}/{final_report['limit']} used ({final_report['percent_used']}%)")
+    log.info(
+        "\nFinal Quota: %s/%s units used (%s%%); uploads %s/%s",
+        final_report["used"],
+        final_report["limit"],
+        final_report["percent_used"],
+        final_report["uploads"],
+        final_report["upload_limit"],
+    )
 
     log.info("\n" + "=" * 60)
-    log.info("  DAILY AUTOPILOT BUNDLE COMPLETE!")
-    log.info(f"  Long Video: {'✅' if long_video_info else '❌'}")
-    log.info(f"  Shorts: {len(shorts_results)}/4 scheduled")
-    log.info("  All videos safely scheduled on YouTube servers.")
-    log.info("  You can now safely shut down or use your laptop.")
+    if success:
+        log.info("  DAILY AUTOPILOT BUNDLE COMPLETE")
+    else:
+        log.info("  DAILY AUTOPILOT FINISHED WITH ERRORS")
+    log.info("  Long Video: %s", "OK" if long_ok else "FAILED")
+    log.info(
+        "  Shorts: %s/%s scheduled",
+        len(scheduled_today),
+        expected_shorts,
+    )
+    if long_error:
+        log.error("  Long video error: %s", long_error)
+    if shorts_error:
+        log.error("  Shorts error: %s", shorts_error)
+    if success:
+        log.info("  All requested videos are scheduled on YouTube.")
+    else:
+        log.info("  Check the errors above; the run will not be reported as successful.")
     log.info("=" * 60)
 
     return {
-        "success": True,
+        "success": success,
         "date": today_key,
         "long_video": long_video_info,
+        "long_error": long_error,
         "shorts": shorts_results,
-        "quota_used": final_report['used'],
-        "quota_limit": final_report['limit']
+        "shorts_scheduled": len(scheduled_today),
+        "shorts_expected": expected_shorts,
+        "shorts_error": shorts_error,
+        "quota_used": final_report["used"],
+        "quota_limit": final_report["limit"],
     }
 
 
@@ -184,20 +222,35 @@ def main():
 
     if args.long_only:
         from long_video_engine import build_and_publish_daily_long_video
-        build_and_publish_daily_long_video(args.channel)
+
+        result = build_and_publish_daily_long_video(args.channel)
+        if not result or not result.get("id"):
+            log.error("Long-video run did not produce a scheduled video")
+            sys.exit(1)
         return
 
     if args.shorts_only:
         run_daily_shorts(args.channel)
+        expected = len(get_config().schedule.shorts_standard_slots)
+        scheduled = len(
+            load_db().get("scheduled_slots", {}).get(get_date_key(), [])
+        )
+        log.info("Shorts scheduled today: %s/%s", scheduled, expected)
+        if scheduled < expected:
+            log.error("Shorts run did not schedule every configured slot")
+            sys.exit(1)
         return
 
     # Default: run master autopilot
     if args.all_channels:
-        run_all_channels()
+        results = run_all_channels()
+        if not all(result.get("success") for result in results.values()):
+            sys.exit(1)
     else:
-        # Use default channel or specified channel
         channel = args.channel or get_config().default_channel
-        run_master_autopilot(channel)
+        result = run_master_autopilot(channel)
+        if not result.get("success"):
+            sys.exit(1)
 
 
 if __name__ == '__main__':

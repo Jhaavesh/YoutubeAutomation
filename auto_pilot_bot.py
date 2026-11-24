@@ -3,11 +3,8 @@ DON OF VICE CITY — Shorts Engine (Refactored)
 Generates 9:16 vertical Shorts with bold typography, Phonk audio, and smart scheduling.
 """
 import os
-import sys
-import time
-import logging
 import random
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict, Any, List, Optional
 
 import yt_dlp
@@ -16,13 +13,13 @@ import yt_dlp
 from config_loader import get_config
 from utils import (
     load_db, save_db, get_ffmpeg_exe, run_ffmpeg, sanitize_drawtext,
-    wait_for_internet, format_iso_ist, format_time_ist, get_timestamp, get_date_key,
-    get_audio_track, ensure_output_dirs, cleanup_old_files,
-    compute_schedule_times
+    format_iso_tz, format_time_ist, get_timestamp,
+    get_date_key, get_audio_track, ensure_output_dirs, cleanup_old_files,
+    compute_schedule_times, now_local, setup_logging,
 )
-from upload_video import upload_short, get_quota_report
+from upload_video import upload_short
 
-log = logging.getLogger("auto_pilot_bot")
+log = setup_logging("auto_pilot_bot")
 
 
 # ============================================================================
@@ -35,8 +32,9 @@ def find_and_download_unique_source_clip(
     duration: int = 35
 ) -> Optional[str]:
     """
-    Search top 10 YouTube results and download a never-before-used clip.
-    Guarantees 100% unique footage.
+    Search the configured number of YouTube results and download a clip whose
+    source ID has not been used before.  This is deduplication, not a license
+    or copyright guarantee.
     """
     cfg = get_config()
     download_cfg = cfg.download
@@ -117,19 +115,23 @@ def edit_to_vertical_short(
     # Sanitize
     clean_hook = sanitize_drawtext(hook_text)
     clean_bottom = sanitize_drawtext(bottom_text)
+    font_arg = font_file
     watermark = video_cfg.short_watermark
 
     filter_complex = (
-        f"[0:v]trim=start={video_cfg.short_trim_start}:duration={video_cfg.short_duration},setpts=PTS-STARTPTS,"
-        f"scale={video_cfg.short_resolution}:force_original_aspect_ratio=increase,crop={video_cfg.short_resolution},"
+        # The download already starts at short_start_seconds.  Do not trim a
+        # second time here.
+        f"[0:v]trim=duration={video_cfg.short_duration},setpts=PTS-STARTPTS,"
+        f"scale={video_cfg.short_resolution}:force_original_aspect_ratio=increase,"
+        f"crop={video_cfg.short_resolution},fps={video_cfg.short_fps},"
         # Hook text (top)
-        f"drawtext=fontfile='{font_file}':text='{clean_hook}':fontcolor=white:fontsize=60:borderw=6:bordercolor=black:"
+        f"drawtext=fontfile={font_arg}:text='{clean_hook}':fontcolor=white:fontsize=60:borderw=6:bordercolor=black:"
         f"shadowcolor=black@0.6:shadowx=3:shadowy=3:x=(w-text_w)/2:y=180,"
         # Bottom text
-        f"drawtext=fontfile='{font_file}':text='{clean_bottom}':fontcolor=yellow:fontsize=44:borderw=5:bordercolor=black:"
+        f"drawtext=fontfile={font_arg}:text='{clean_bottom}':fontcolor=yellow:fontsize=44:borderw=5:bordercolor=black:"
         f"shadowcolor=black@0.6:shadowx=3:shadowy=3:x=(w-text_w)/2:y=260,"
         # Watermark (bottom center)
-        f"drawtext=fontfile='{font_file}':text='{sanitize_drawtext(watermark.get('text', 'DON OF VICE CITY'))}':"
+        f"drawtext=fontfile={font_arg}:text='{sanitize_drawtext(watermark.get('text', 'DON OF VICE CITY'))}':"
         f"fontcolor={watermark.get('color', 'cyan')}:fontsize={watermark.get('font_size', 36)}:"
         f"borderw=3:bordercolor=black:"
         f"shadowcolor=black@0.6:shadowx=2:shadowy=2:"
@@ -140,7 +142,6 @@ def edit_to_vertical_short(
 
     cmd = [
         '-y',
-        '-ss', str(video_cfg.short_trim_start),
         '-i', input_video,
         '-stream_loop', '-1',
         '-i', audio_track,
@@ -150,9 +151,12 @@ def edit_to_vertical_short(
         '-c:v', 'libx264',
         '-preset', video_cfg.short_preset,
         '-crf', str(video_cfg.short_crf),
+        '-r', str(video_cfg.short_fps),
+        '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-b:a', video_cfg.short_audio_bitrate,
         '-t', str(video_cfg.short_duration),
+        '-movflags', '+faststart',
         output_video
     ]
 
@@ -174,6 +178,16 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
     cfg = get_config()
     ensure_output_dirs()
 
+    if not cfg.shorts_pool:
+        raise ValueError("topics.shorts_pool is empty; cannot build Shorts")
+
+    if not cfg.source_policy.get("rights_confirmed", False):
+        log.warning(
+            "source_policy.rights_confirmed is false. The current pipeline "
+            "downloads third-party YouTube footage; only publish footage you "
+            "own or have permission to reuse."
+        )
+
     db = load_db()
     today_key = get_date_key()
 
@@ -191,7 +205,7 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
     log.info(f"Pending Shorts: {len(pending_slots)} slot(s)")
 
     # Compute schedule times
-    now = datetime.now()
+    now = now_local()
     schedule_times = compute_schedule_times(
         pending_slots=pending_slots,
         now=now,
@@ -211,14 +225,18 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
 
     # Long video URL for cross-promotion
     long_video_url = long_video_info.get('url', f'https://www.youtube.com/@{cfg.default_channel}') if long_video_info else f'https://www.youtube.com/@{cfg.default_channel}'
-    long_video_title = long_video_info.get('title', 'GTA 6 4K Ultra Gameplay') if long_video_info else 'GTA 6 4K Ultra Gameplay'
+    long_video_title = (
+        long_video_info.get('title', 'GTA 6 1440p Gameplay')
+        if long_video_info
+        else 'GTA 6 1440p Gameplay'
+    )
 
     results = []
 
     for i, slot in enumerate(pending_slots):
         topic = available_topics[i % len(available_topics)]
         target_time = schedule_times[i]
-        publish_iso = format_iso_ist(target_time)
+        publish_iso = format_iso_tz(target_time)
         time_str = format_time_ist(target_time)
 
         log.info(f"\n>>> [Short {slot['slot_id']}/{len(cfg.schedule.shorts_standard_slots)}] Target: {time_str} | {topic['title']}")
@@ -244,10 +262,11 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
             # 3. Build description with cross-promotion CTA
             description = (
                 f"{topic['hook_text']} — {topic['bottom_text']}\n\n"
-                f"🔥 WATCH FULL 4K VIDEO HERE:\n"
-                f"👉 {long_video_url}\n"
+                f"WATCH THE FULL 1440p VIDEO HERE:\n"
+                f"{long_video_url}\n"
                 f"({long_video_title})\n\n"
-                f"📌 SUBSCRIBE to @{cfg.default_channel} for daily GTA 6 leaks, physics, and gameplay!\n\n"
+                f"SUBSCRIBE to @{cfg.default_channel} for daily GTA 6 "
+                f"physics and gameplay!\n\n"
                 f"#gta6 #shorts #gaming #vicecity #ps5pro"
             )
 
@@ -299,8 +318,14 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
     cleanup_old_files(cfg.get_output_path())
 
     log.info("\n" + "=" * 60)
-    log.info(f"  ALL {len(results)} SHORTS SCHEDULED ON YOUTUBE!")
-    log.info("  YouTube will auto-publish each at the scheduled time.")
+    log.info(
+        "  SHORTS RESULT: %s/%s newly scheduled",
+        len(results),
+        len(pending_slots),
+    )
+    if len(results) < len(pending_slots):
+        log.warning("  Some Shorts failed; see the errors above.")
+    log.info("  YouTube will auto-publish each at its scheduled time.")
     log.info("=" * 60)
 
     return results
@@ -329,17 +354,21 @@ def run_single_short(
     if not topic:
         raise ValueError(f"Topic not found: {topic_category}")
 
-    # Schedule for 20 min from now
-    now = datetime.now() + timedelta(minutes=20)
+    # Schedule for 20 min from now in the configured timezone.
+    now = now_local() + timedelta(minutes=20)
     minute = (now.minute // 5) * 5
     target_time = now.replace(minute=minute, second=0, microsecond=0)
-    publish_iso = format_iso_ist(target_time)
+    publish_iso = format_iso_tz(target_time)
 
     ensure_output_dirs()
     bg_audio = get_audio_track()
 
     long_video_url = long_video_info.get('url', f'https://www.youtube.com/@{cfg.default_channel}') if long_video_info else f'https://www.youtube.com/@{cfg.default_channel}'
-    long_video_title = long_video_info.get('title', 'GTA 6 4K Ultra Gameplay') if long_video_info else 'GTA 6 4K Ultra Gameplay'
+    long_video_title = (
+        long_video_info.get('title', 'GTA 6 1440p Gameplay')
+        if long_video_info
+        else 'GTA 6 1440p Gameplay'
+    )
 
     timestamp = get_timestamp()
     temp_raw = cfg.get_output_path(f"raw_short_{slot_id}_{timestamp}.mp4")
@@ -355,10 +384,11 @@ def run_single_short(
 
         description = (
             f"{topic['hook_text']} — {topic['bottom_text']}\n\n"
-            f"🔥 WATCH FULL 4K VIDEO HERE:\n"
-            f"👉 {long_video_url}\n"
+            f"WATCH THE FULL 1440p VIDEO HERE:\n"
+            f"{long_video_url}\n"
             f"({long_video_title})\n\n"
-            f"📌 SUBSCRIBE to @{cfg.default_channel} for daily GTA 6 leaks, physics, and gameplay!\n\n"
+            f"SUBSCRIBE to @{cfg.default_channel} for daily GTA 6 "
+            f"physics and gameplay!\n\n"
             f"#gta6 #shorts #gaming #vicecity #ps5pro"
         )
 

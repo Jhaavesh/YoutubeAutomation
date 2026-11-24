@@ -1,27 +1,25 @@
 """
 DON OF VICE CITY — Long Video Engine (Refactored)
-Generates 16:9 1440p Ultra HD long-form videos with chapters, watermarks, and NCS audio.
+Generates 16:9 1440p long-form videos with chapters, watermarks, and local audio.
 """
 import os
 import sys
-import time
-import logging
-import random
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from datetime import timedelta
+from typing import Dict, Any, Optional
 
 import yt_dlp
 
 # Local imports
-from config_loader import get_config, ConfigLoader
+from config_loader import get_config
 from utils import (
     load_db, save_db, get_ffmpeg_exe, run_ffmpeg, sanitize_drawtext,
-    wait_for_internet, format_iso_ist, get_timestamp, get_date_key,
-    get_audio_track, ensure_output_dirs, cleanup_old_files
+    format_iso_tz, get_timestamp, get_date_key,
+    get_audio_track, ensure_output_dirs, cleanup_old_files, now_local,
+    probe_video, setup_logging,
 )
-from upload_video import upload_long_video, get_quota_report
+from upload_video import upload_long_video
 
-log = logging.getLogger("long_video_engine")
+log = setup_logging("long_video_engine")
 
 
 # ============================================================================
@@ -122,7 +120,7 @@ def render_long_video(
     audio_track: str
 ) -> None:
     """
-    Render 16:9 1440p Ultra HD video with:
+    Render a 16:9 1440p video with:
     - Color grading (saturation/contrast boost)
     - Floating chapter titles (no black boxes)
     - Branded watermark
@@ -137,14 +135,17 @@ def render_long_video(
     # Sanitize texts
     clean_intro = sanitize_drawtext(intro_title)
     clean_sub = sanitize_drawtext(sub_title)
+    font_arg = font_file
     watermark = video_cfg.long_watermark
 
     # Build filter complex
     filter_parts = [
-        # Video processing chain
-        f"[0:v]trim=start=5:duration={duration_sec},setpts=PTS-STARTPTS,"
+        # The source was already trimmed by yt-dlp's download_ranges.  Do not
+        # trim again here: the old code skipped a second 5 seconds.
+        f"[0:v]trim=duration={duration_sec},setpts=PTS-STARTPTS,"
         f"scale={video_cfg.long_resolution}:force_original_aspect_ratio=decrease,"
         f"pad={video_cfg.long_resolution}:(ow-iw)/2:(oh-ih)/2,"
+        f"fps={video_cfg.long_fps},"
         f"eq=saturation={video_cfg.long_saturation}:contrast={video_cfg.long_contrast},"
     ]
 
@@ -155,7 +156,7 @@ def render_long_video(
     wm_margin = watermark.get('margin', 50)
 
     filter_parts.append(
-        f"drawtext=fontfile='{font_file}':"
+        f"drawtext=fontfile={font_arg}:"
         f"text='{sanitize_drawtext(wm_text)}':"
         f"fontcolor={wm_color}:fontsize={wm_size}:"
         f"borderw=4:bordercolor=black:"
@@ -165,7 +166,7 @@ def render_long_video(
 
     # Intro title (center top)
     filter_parts.append(
-        f"drawtext=fontfile='{font_file}':"
+        f"drawtext=fontfile={font_arg}:"
         f"text='{clean_intro}':"
         f"fontcolor=white:fontsize=64:"
         f"borderw=7:bordercolor=black:"
@@ -175,7 +176,7 @@ def render_long_video(
 
     # Sub title (below intro)
     filter_parts.append(
-        f"drawtext=fontfile='{font_file}':"
+        f"drawtext=fontfile={font_arg}:"
         f"text='{clean_sub}':"
         f"fontcolor=yellow:fontsize=48:"
         f"borderw=5:bordercolor=black:"
@@ -190,7 +191,6 @@ def render_long_video(
 
     cmd = [
         '-y',
-        '-ss', '5',
         '-i', raw_video,
         '-stream_loop', '-1',
         '-i', audio_track,
@@ -200,9 +200,12 @@ def render_long_video(
         '-c:v', 'libx264',
         '-preset', video_cfg.long_preset,
         '-crf', str(video_cfg.long_crf),
+        '-r', str(video_cfg.long_fps),
+        '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-b:a', video_cfg.long_audio_bitrate,
         '-t', str(duration_sec),
+        '-movflags', '+faststart',
         output_video
     ]
 
@@ -226,18 +229,26 @@ def generate_custom_thumbnail(
 
     clean_main = sanitize_drawtext(main_text)
     clean_sub = sanitize_drawtext(sub_text)
+    font_arg = format_drawtext_path(font_file)
+
+    # Avoid seeking past the end of a short clip.
+    try:
+        duration = probe_video(video_path)["duration"]
+    except Exception:
+        duration = 30.0
+    frame_time = max(0.5, min(30.0, duration * 0.5))
 
     vf = (
         f"scale=1920:1080,"
         f"eq=saturation=1.2:contrast=1.1,"
-        f"drawtext=fontfile='{font_file}':text='{clean_main}':fontcolor=yellow:fontsize=95:borderw=10:bordercolor=black:shadowcolor=black@0.8:shadowx=6:shadowy=6:x=(w-text_w)/2:y=80,"
-        f"drawtext=fontfile='{font_file}':text='{clean_sub}':fontcolor=white:fontsize=70:borderw=9:bordercolor=black:shadowcolor=black@0.8:shadowx=6:shadowy=6:x=(w-text_w)/2:y=200,"
-        f"drawtext=fontfile='{font_file}':text='DON OF VICE CITY':fontcolor=cyan:fontsize=50:borderw=6:bordercolor=black:shadowcolor=black@0.8:shadowx=4:shadowy=4:x=(w-text_w)/2:y=920"
+        f"drawtext=fontfile={font_arg}:text='{clean_main}':fontcolor=yellow:fontsize=95:borderw=10:bordercolor=black:shadowcolor=black@0.8:shadowx=6:shadowy=6:x=(w-text_w)/2:y=80,"
+        f"drawtext=fontfile={font_arg}:text='{clean_sub}':fontcolor=white:fontsize=70:borderw=9:bordercolor=black:shadowcolor=black@0.8:shadowx=6:shadowy=6:x=(w-text_w)/2:y=200,"
+        f"drawtext=fontfile={font_arg}:text='DON OF VICE CITY':fontcolor=cyan:fontsize=50:borderw=6:bordercolor=black:shadowcolor=black@0.8:shadowx=4:shadowy=4:x=(w-text_w)/2:y=920"
     )
 
     cmd = [
         '-y',
-        '-ss', '30',
+        '-ss', f'{frame_time:.3f}',
         '-i', video_path,
         '-vf', vf,
         '-vframes', '1',
@@ -262,6 +273,16 @@ def build_and_publish_daily_long_video(channel_key: Optional[str] = None) -> Dic
 
     cfg = get_config()
     ensure_output_dirs()
+
+    if not cfg.long_video_pool:
+        raise ValueError("topics.long_video_pool is empty; cannot build a long video")
+
+    if not cfg.source_policy.get("rights_confirmed", False):
+        log.warning(
+            "source_policy.rights_confirmed is false. The current pipeline "
+            "downloads third-party YouTube footage; only publish footage you "
+            "own or have permission to reuse."
+        )
 
     db = load_db()
     today_key = get_date_key()
@@ -290,19 +311,32 @@ def build_and_publish_daily_long_video(channel_key: Optional[str] = None) -> Dic
     topic = selected_topic
     log.info(f"Selected topic: {topic['title']} (ID: {topic['id_key']})")
 
-    # Schedule time: Today at 6:00 PM IST
-    now = datetime.now()
-    target_time = now.replace(hour=cfg.schedule.long_video_hour, minute=cfg.schedule.long_video_minute, second=0, microsecond=0)
+    # Schedule time in the configured timezone.
+    now = now_local()
+    target_time = now.replace(
+        hour=cfg.schedule.long_video_hour,
+        minute=cfg.schedule.long_video_minute,
+        second=0,
+        microsecond=0,
+    )
 
     min_lead = timedelta(minutes=cfg.schedule.long_min_lead_minutes)
     if now >= target_time - min_lead:
         target_time = now + min_lead
-        # Round to nearest 5 minutes
-        minute = (target_time.minute // cfg.schedule.long_round_minutes) * cfg.schedule.long_round_minutes
-        target_time = target_time.replace(minute=minute, second=0, microsecond=0)
+        minute = (
+            target_time.minute // cfg.schedule.long_round_minutes
+        ) * cfg.schedule.long_round_minutes
+        target_time = target_time.replace(
+            minute=minute, second=0, microsecond=0
+        )
 
-    publish_iso = format_iso_ist(target_time)
-    log.info(f"Scheduling for: {target_time.strftime('%I:%M %p')} IST ({publish_iso})")
+    publish_iso = format_iso_tz(target_time)
+    log.info(
+        "Scheduling for: %s %s (%s)",
+        target_time.strftime("%I:%M %p"),
+        cfg.schedule.timezone,
+        publish_iso,
+    )
 
     # Paths
     timestamp = get_timestamp()
@@ -326,7 +360,7 @@ def build_and_publish_daily_long_video(channel_key: Optional[str] = None) -> Dic
             db["used_source_ids"].append(src_id)
 
         # 2. Render video
-        log.info("2/4 Rendering 1440p Ultra HD video...")
+        log.info("2/4 Rendering 1440p video...")
         render_long_video(
             raw_path, final_path,
             topic['intro_title'], topic['sub_title'],
@@ -340,12 +374,13 @@ def build_and_publish_daily_long_video(channel_key: Optional[str] = None) -> Dic
         # 4. Build description with chapters
         desc = (
             f"{topic['title']}\n\n"
-            "Experience next-gen Grand Theft Auto VI in stunning 1440p/4K 60FPS! "
-            "Witness Vice City's extreme open-world realism, advanced AI, dynamic physics, "
+            "Experience next-gen Grand Theft Auto VI in 1440p 60FPS. "
+            "Witness Vice City's open-world realism, dynamic physics, "
             "and intense action in the state of Leonida.\n\n"
             "TIMESTAMPS / CHAPTERS:\n"
             + "\n".join([f"{c['time']} - {c['title']}" for c in topic['chapters']])
-            + f"\n\n🔥 SUBSCRIBE to @{cfg.default_channel} for daily GTA 6 4K gameplay, physics comparisons, and police escapes!\n\n"
+            + f"\n\nSUBSCRIBE to @{cfg.default_channel} for daily GTA 6 gameplay, "
+            "physics comparisons, and police escapes!\n\n"
             "#gta6 #gta6gameplay #vicecity #ps5pro #rockstargames #gtavi #donofvicecity"
         )
 

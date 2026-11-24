@@ -1,107 +1,138 @@
-# 🎬 DON OF VICE CITY — YouTube Automation Pipeline (Refactored)
+# DON OF VICE CITY — YouTube Automation Pipeline
 
-An automated, zero-touch YouTube channel growth engine for high-engagement gaming content (GTA 6 / GTA 5). Produces **1 Daily 16:9 Ultra HD 1440p Long Video** + **4 Daily 9:16 Action Shorts** with intelligent deduplication, copyright-safe audio, cross-promotion funneling, and advance scheduling.
+A Windows-first, configuration-driven YouTube automation pipeline. It builds
+one 16:9 long video and the configured number of 9:16 Shorts, schedules them
+through the official YouTube Data API, and records enough state to avoid
+duplicate processing.
 
----
-
-## 🌟 What's New in Refactored Version
-
-| Feature | Before | After |
-|---------|--------|-------|
-| **Configuration** | Hardcoded in multiple files | Single `config.yaml` |
-| **Multi-channel** | Not supported | ✅ Full support |
-| **Quota tracking** | Manual estimation | ✅ Automatic with alerts |
-| **Code reuse** | Duplicated across 3 files | ✅ Shared `utils.py` |
-| **Logging** | Print statements | ✅ Structured rotating logs |
-| **Boot automation** | Basic VBS | ✅ Batch + PowerShell + health checks |
-| **Monitoring** | None | ✅ `health_check.py` |
-| **Testing** | Manual only | ✅ CLI flags for single runs |
+**Phase 3 status:** stabilized and covered by offline regression tests. The
+pipeline still uses third-party gameplay footage from YouTube; see
+[Content and source compliance](#content-and-source-compliance) before
+publishing at scale.
 
 ---
 
-## 📁 Repository Structure
+## What Phase 3 changed
+
+| Area | Change |
+|------|--------|
+| Configuration | `config_version: 2`; all sections load through `config_loader.py`; `config.example.yaml` is safe to commit |
+| Scheduling | Timezone-aware (`Asia/Kolkata` by default); no naive `datetime.now()` scheduling |
+| Uploads | Pre-upload FFprobe validation, retries with backoff, Pacific-time quota tracking, duplicate protection |
+| Duplicate safety | SHA-256 upload ledger (`upload_ledger.json`) ties file bytes + channel to an existing video ID |
+| Quota | Correct 1,600-unit cost per upload plus a separate upload-count cap; alerts at the configured threshold |
+| OAuth | `setup_auth.py` requests upload, metadata/thumbnail, and Analytics scopes; verifies granted scopes |
+| Approval | `approval.required: true` forces a private draft and refuses public/unlisted metadata changes |
+| Rendering | Removed double trimming; output FPS is enforced from config; thumbnail seek is duration-aware |
+| Reliability | Single-instance lock; honest exit codes; no fake fallback video URL on failure |
+| Diagnostics | New read-only `doctor.py`; `health_check.py` reports real package names, FFmpeg path, and token scopes |
+| Launchers | `run_daily.ps1` no longer executes Python twice or recurses in its event-log helper; batch and Python logs are separated |
+| Tests | `tests/test_phase3.py` covers config, time, locks, ledger, quota, approval, duplicate uploads, and real FFmpeg output |
+
+---
+
+## Repository structure
 
 ```
-YoutubeAutomation/
-├── config.yaml              # ⚙️ CENTRAL CONFIGURATION (EDIT THIS)
-├── config_loader.py         # Loads & validates config.yaml
-├── utils.py                 # Shared utilities (DB, FFmpeg, quota, scheduling)
-├── upload_video.py          # YouTube upload with quota tracking
-├── long_video_engine.py     # 16:9 1440p Long video generation
-├── auto_pilot_bot.py        # 9:16 Shorts generation
-├── master_autopilot.py      # 🎯 MAIN ORCHESTRATOR (run this)
-├── setup_auth.py            # OAuth authentication (multi-channel)
-├── health_check.py          # System monitoring & diagnostics
-├── run_daily.bat            # Windows batch launcher
-├── run_daily.ps1            # PowerShell launcher (recommended)
-├── launch_silent.vbs        # Silent Windows startup launcher
-├── requirements.txt         # Python dependencies
-├── client_secret.json       # 🔐 OAuth credentials (NOT in git)
-├── token.pickle             # 🔐 Auth tokens (NOT in git)
-├── autopilot_db.json        # Runtime database (auto-generated)
-├── autopilot.log            # Main log (auto-generated)
-├── assets/
-│   └── audio/
-│       └── phonk_1.mp3      # Background music
-└── daily_generated/         # Temporary video files (auto-cleaned)
+Youtube/
+├── config.yaml               # Local configuration (git-ignored)
+├── config.example.yaml       # Committable template
+├── config_loader.py          # Schema, path resolution, validation
+├── utils.py                  # Logging, locks, ledger, quota, timezone, FFmpeg
+├── upload_video.py           # OAuth, validation, upload, metadata, thumbnails
+├── long_video_engine.py      # Long-video download/render/upload
+├── auto_pilot_bot.py         # Shorts download/render/upload
+├── master_autopilot.py       # Main orchestrator and CLI
+├── continuous_autopilot.py   # Daemon / scheduled single-cycle wrapper
+├── setup_auth.py             # OAuth setup per channel
+├── doctor.py                 # Read-only preflight diagnostics
+├── health_check.py           # Read-only system health report
+├── run_daily.bat             # Batch launcher used by the current task
+├── run_daily.ps1             # PowerShell launcher (optional)
+├── launch_silent.vbs         # Silent startup launcher
+├── tests/test_phase3.py      # Offline regression suite
+├── assets/audio/             # Background music
+├── daily_generated/          # Rendered media (auto-cleaned)
+├── autopilot_db.json         # Runtime state (git-ignored)
+├── upload_ledger.json        # Upload idempotency ledger (git-ignored)
+├── autopilot.log             # Python rotating log (git-ignored)
+└── backups/                  # Local backups (git-ignored)
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick start
 
-### 1. Install Dependencies
-```bash
+### 1. Install dependencies
+
+```powershell
 pip install -r requirements.txt
 ```
 
-### 2. Install FFmpeg
-- **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-- Or use the path in `config.yaml`: `C:/Users/Awesh/AppData/Local/Programs/Python/Python312/Scripts/ffmpeg.exe`
+FFmpeg and FFprobe must be installed. Leave `paths.ffmpeg_exe` and
+`paths.ffprobe_exe` empty to auto-detect from `PATH`, or set explicit paths in
+`config.yaml`.
 
-### 3. Configure YouTube API
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create project → Enable **YouTube Data API v3**
-3. Create **OAuth 2.0 Client ID** (Desktop app)
-4. Download `client_secret.json` → place in project root
+### 2. Configure YouTube API
 
-### 4. Authenticate Channel
-```bash
-# Authenticate default channel
-python setup_auth.py
+1. Create a Google Cloud project and enable **YouTube Data API v3**.
+2. Create an **OAuth 2.0 Client ID** of type **Desktop app**.
+3. Download it as `client_secret.json` in the project root.
 
-# Or specific channel
-python setup_auth.py --channel donofvicecity2026
+### 3. Authenticate
 
-# List all configured channels
+```powershell
 python setup_auth.py --list
+python setup_auth.py --channel donofvicecity2026
 ```
 
-### 5. Test Run
-```bash
-# Dry run - check quota only
+Requested scopes:
+
+- `youtube.upload` — upload videos
+- `youtube.force-ssl` — edit metadata, delete videos, set thumbnails
+- `yt-analytics.readonly` — read Analytics in later phases
+
+The existing token in this workspace only has `youtube.upload` and
+`youtube.readonly`. Uploads work, but metadata updates, deletions, and
+Analytics will fail until the channel is re-authenticated. Custom thumbnails
+also require a channel verified for custom thumbnails; otherwise YouTube
+returns `403` and the pipeline logs a warning without failing the upload.
+
+### 4. Preflight
+
+```powershell
+python doctor.py
 python master_autopilot.py --quota
+```
 
-# Run only long video
+`doctor.py` is read-only. It checks imports, config sections, audio/font
+assets, FFmpeg/FFprobe, OAuth scopes, quota, state files, the Windows task, and
+the latest rendered media.
+
+### 5. First real run
+
+```powershell
+python master_autopilot.py --verify
 python master_autopilot.py --long-only
-
-# Run only shorts
 python master_autopilot.py --shorts-only
-
-# Full daily run
 python master_autopilot.py
 ```
 
+A full run uploads and schedules real videos. Use `--quota`/`--verify` for
+non-publishing checks.
+
 ---
 
-## ⚙️ Configuration: `config.yaml`
+## Configuration
 
-**All settings in one file** — no need to edit Python code.
+`config.yaml` is the local source of truth. `config.example.yaml` is generated
+from it with machine-specific binary paths blanked.
 
-### Key Sections:
+Key sections:
 
 ```yaml
-# Channel setup (multi-channel ready)
+config_version: 2
+
 channels:
   default: "donofvicecity2026"
   accounts:
@@ -110,271 +141,299 @@ channels:
       token_file: "token.pickle"
       client_secret_file: "client_secret.json"
 
-# Video specifications
 video:
   long:
-    resolution: "2560x1440"   # 1440p triggers VP9/AV1 codec
+    resolution: "2560x1440"
+    fps: 60
     duration_range_seconds: [150, 180]
   short:
-    resolution: "1080x1920"   # 9:16 vertical
+    resolution: "1080x1920"
+    fps: 60
     duration_seconds: 26
 
-# Daily schedule (IST)
 schedule:
+  timezone: "Asia/Kolkata"
   long_video:
-    target_hour: 18           # 6:00 PM
+    target_hour: 18
+    target_minute: 0
+    min_lead_minutes: 15
+    round_to_minutes: 5
   shorts:
     standard_slots:
-      - {slot_id: 1, hour: 13, minute: 0}    # 1:00 PM
-      - {slot_id: 2, hour: 16, minute: 30}   # 4:30 PM
-      - {slot_id: 3, hour: 19, minute: 30}   # 7:30 PM
-      - {slot_id: 4, hour: 22, minute: 30}   # 10:30 PM
+      - {slot_id: 1, name: "Slot 1", hour: 13, minute: 0}
+      - {slot_id: 2, name: "Slot 2", hour: 16, minute: 30}
+      - {slot_id: 3, name: "Slot 3", hour: 19, minute: 30}
+      - {slot_id: 4, name: "Slot 4", hour: 22, minute: 30}
+    min_first_lead_minutes: 20
+    end_of_day_hour: 23
+    end_of_day_minute: 30
 
-# Quota management
 quota:
   daily_limit: 10000
+  upload_daily_limit: 100
+  search_daily_limit: 100
+  reset_timezone: "America/Los_Angeles"
   costs:
     video_upload: 1600
+    video_update: 50
+    video_list: 1
+    search_list: 100
     thumbnail_set: 50
   alert_threshold_percent: 80
+  reserve_buffer: 2000
 
-# Content topics (easy to extend)
-topics:
-  long_video_pool: [...]
-  shorts_pool: [...]
+approval:
+  required: false       # true = private draft, never auto-publish
+  auto_approve: true    # used only when required is false
+
+source_policy:
+  allow_external_downloads: true
+  rights_confirmed: false
 ```
 
----
+### Scheduling behavior
 
-## 📅 Daily Schedule (IST)
-
-| Content | Time | Purpose |
-|---------|------|---------|
-| **Long Video** | 6:00 PM | Prime time, max watch time |
-| **Short 1** | 1:00 PM | Lunch break scroll |
-| **Short 2** | 4:30 PM | Evening commute |
-| **Short 3** | 7:30 PM | Dinner prime time |
-| **Short 4** | 10:30 PM | Late night binge |
-
-### Smart Dynamic Scheduling
-If you boot the laptop **after** a scheduled time (e.g., 3:00 PM), the system:
-1. Skips past slots
-2. Spreads remaining videos evenly until 11:30 PM
-3. **Never skips a video** — all 4 shorts + 1 long always publish same day
+- If a standard slot is still far enough in the future, it is used.
+- If the machine starts late, past slots are skipped and remaining Shorts are
+  spread between now and the configured end-of-day time.
+- A long video whose target time has passed is scheduled at
+  `now + min_lead_minutes`, rounded to the configured interval.
+- Scheduling depends on a successful upload; quota exhaustion, network
+  failures, or API errors can still prevent a video from being scheduled.
 
 ---
 
-## 🔗 Cross-Promotion Funnel
+## Quota
 
-Every Short automatically includes:
-```
-🔥 WATCH FULL 4K VIDEO HERE:
-👉 https://www.youtube.com/watch?v=LONG_VIDEO_ID
-(Long Video Title)
-```
-This funnels Shorts viewers → Long Video → **AdSense revenue + watch time boost**.
+YouTube grants **10,000 general quota units per day**, reset at midnight
+Pacific Time. A video upload costs **1,600 units**, and YouTube also applies a
+separate cap of **100 uploads/day**. Search has its own 100-calls/day cap.
 
----
+| Operation | Units | Daily count | Total |
+|-----------|------:|------------:|------:|
+| Long video upload | 1,600 | 1 | 1,600 |
+| Shorts uploads | 1,600 | 4 | 6,400 |
+| Thumbnail set | 50 | 1 | 50 |
+| **Estimated total** | | | **8,050 / 10,000** |
 
-## 🛡️ Copyright Protection
+That leaves roughly **1,950 units**, not a guarantee. Metadata updates,
+retries, manual calls, and other tools consume the same bucket. The tracker
+blocks an upload when the projected cost would exceed 10,000 units and warns
+at the configured threshold.
 
-- **In-game audio stripped** via FFmpeg (radio songs, dialogue)
-- **Only NCS/royalty-free Phonk** mixed in
-- **Content ID safe** — zero copyright claims guaranteed
-
----
-
-## 📊 Quota Management
-
-| Operation | Cost | Daily (1 Long + 4 Shorts) |
-|-----------|------|---------------------------|
-| Video Upload | 1,600 | 5 × 1,600 = 8,000 |
-| Thumbnail Set | 50 | 1 × 50 = 50 |
-| **Total** | | **8,050 / 10,000** |
-
-✅ **2,000 units buffer** — completely immune to quota limits!
-
-**Monitor quota:**
-```bash
-python upload_video.py --quota
-python health_check.py  # Includes quota check
-```
-
----
-
-## 🖥️ Windows Boot Automation
-
-### Option 1: Silent VBS (Original)
-1. Create shortcut to `launch_silent.vbs`
-2. Place in **Startup folder**: `Win+R` → `shell:startup`
-3. Runs completely hidden on boot
-
-### Option 2: PowerShell (Recommended)
-- Better error handling, Event Log integration, structured logging
-- Run manually: `.\run_daily.ps1`
-- Or create scheduled task triggered on startup
-
-### Option 3: Task Scheduler (Most Reliable)
 ```powershell
-# Run as admin
-$action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-File C:\Ajfiles\Youtube\run_daily.ps1"
-$trigger = New-ScheduledTaskTrigger -AtStartup
-Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "DonOfViceCity_Daily" -RunLevel Highest
+python upload_video.py --quota
+python master_autopilot.py --quota
 ```
+
+`daily_limit`, upload/search caps, costs, and `reset_timezone` are configurable,
+but keep them aligned with Google's current published limits.
 
 ---
 
-## 🔧 CLI Usage Reference
+## Approval mode
 
-### Master Autopilot
-```bash
-python master_autopilot.py                    # Full daily run (default channel)
+Default behavior preserves the current zero-touch pipeline:
+`approval.required: false` and `approval.auto_approve: true`. Videos are
+uploaded with `privacyStatus: private` plus `publishAt`, so YouTube publishes
+them at the scheduled time.
+
+If `approval.required: true`:
+
+- the upload is forced to a **private draft**;
+- `publishAt` is never attached;
+- `update_video_metadata()` refuses to set `public` or `unlisted`;
+- the ledger marks the response with `_approval_required: true`.
+
+There is no automatic approval CLI in Phase 3. Review the draft in YouTube
+Studio, then either publish it manually or set `approval.required: false` and
+re-run the metadata step deliberately.
+
+---
+
+## CLI reference
+
+### Master orchestrator
+
+```powershell
+python master_autopilot.py                    # Full daily run
 python master_autopilot.py --channel KEY      # Specific channel
 python master_autopilot.py --all-channels     # All configured channels
-python master_autopilot.py --long-only        # Only long video
-python master_autopilot.py --shorts-only      # Only shorts
-python master_autopilot.py --quota            # Show quota report
-python master_autopilot.py --verify           # Verify auth
+python master_autopilot.py --long-only        # Long video only
+python master_autopilot.py --shorts-only      # Pending Shorts only
+python master_autopilot.py --quota            # Quota report, no upload
+python master_autopilot.py --verify           # Verify OAuth/channel
 ```
 
-### Long Video Engine
-```bash
-python long_video_engine.py                   # Build today's long video
-python long_video_engine.py --topic ID        # Specific topic (testing)
-python long_video_engine.py --quota           # Quota report
+Exit code is `0` only when the requested work is actually scheduled. A failed
+long video, a Shorts shortfall, or another exception returns non-zero.
+
+### Long video
+
+```powershell
+python long_video_engine.py
+python long_video_engine.py --topic ID --channel KEY
+python long_video_engine.py --quota
 ```
 
-### Shorts Engine
-```bash
-python auto_pilot_bot.py                      # All pending shorts
-python auto_pilot_bot.py --slot 2             # Single slot (testing)
-python auto_pilot_bot.py --topic physics      # Specific topic
-python auto_pilot_bot.py --quota              # Quota report
+### Shorts
+
+```powershell
+python auto_pilot_bot.py
+python auto_pilot_bot.py --slot 2
+python auto_pilot_bot.py --topic physics
+python auto_pilot_bot.py --quota
 ```
 
-### Upload Module
-```bash
-python upload_video.py --quota                # Quota report
-python upload_video.py --verify               # Verify channel
-python upload_video.py --verify --channel KEY # Verify specific channel
+### Uploads and auth
+
+```powershell
+python upload_video.py --quota
+python upload_video.py --verify
+python upload_video.py --scopes
+python setup_auth.py --list
+python setup_auth.py --scopes
+python setup_auth.py --channel KEY
 ```
 
-### Setup Auth
-```bash
-python setup_auth.py                          # Default channel
-python setup_auth.py --channel KEY            # Specific channel
-python setup_auth.py --list                   # List channels
-python setup_auth.py --all                    # All channels
+### Diagnostics
+
+```powershell
+python doctor.py
+python doctor.py --json
+python doctor.py --skip-task
+python health_check.py
+python health_check.py -v
+python health_check.py --recent 7
+python health_check.py --fix-duplicates
 ```
 
-### Health Check
-```bash
-python health_check.py                        # Full health report
-python health_check.py -v                     # Verbose (show errors)
-python health_check.py --fix-duplicates       # Clean DB duplicates
-python health_check.py --recent 7             # Show last 7 days uploads
-python health_check.py --json                 # JSON output for monitoring
+### Tests
+
+```powershell
+python -m unittest tests.test_phase3 -v
 ```
+
+The suite is offline except for a one-second locally generated FFmpeg test
+clip. It does not upload anything.
 
 ---
 
-## 📈 Monitoring & Maintenance
+## Windows automation
 
-### Health Check (Run Daily)
-```bash
-# Manual
-python health_check.py
+The current machine uses the task **`DonOfViceCity_DailyShorts`**, which runs
+`run_daily.bat` daily at 13:00. A startup VBS entry can also launch the same
+batch file at login, so overlapping starts are possible. `master_autopilot.py`
+acquires a single-instance lock (`autopilot.lock`); a second process exits
+non-zero instead of producing duplicate videos.
 
-# As scheduled task (PowerShell)
-# Creates Windows Event Log entries on failure
-```
+Do not change the task or startup entry without an explicit decision.
 
-### Key Metrics to Watch
-- **Quota usage** — Should stay < 80%
-- **Disk space** — Auto-cleanup keeps < 100 MB
-- **Duplicate source IDs** — Should be 0
-- **Recent errors** — Check `autopilot.log`
+### Log files
 
-### Log Files
 | File | Purpose |
 |------|---------|
-| `autopilot.log` | Main structured logs (rotating, 10 MB max) |
-| `autopilot_boot.log` | Boot launcher runs |
-| `autopilot_errors.log` | Failed runs only |
-| `last_run_health.json` | Last run status |
+| `autopilot.log` | Python rotating log (owned by Python only) |
+| `autopilot_launcher.log` | `run_daily.ps1` launcher messages |
+| `autopilot_console.log` | `run_daily.bat` stdout/stderr |
+| `autopilot_errors.log` | Failed batch runs |
+| `last_run_health.json` | Last full-run health record |
+| `autopilot_db.json` | Runtime state and daily slots |
+| `upload_ledger.json` | File-hash → video-ID deduplication ledger |
+
+### Optional PowerShell launcher
+
+```powershell
+.\run_daily.ps1
+.\run_daily.ps1 -Channel donofvicecity2026
+.\run_daily.ps1 -QuotaOnly
+.\run_daily.ps1 -VerifyOnly
+```
+
+`-QuotaOnly` and `-VerifyOnly` do not overwrite the last full-run health
+record.
 
 ---
 
-## 🎯 Adding New Channels
+## Content and source compliance
 
-1. **Add to `config.yaml`:**
-```yaml
-channels:
-  accounts:
-    newchannel:
-      name: "NEW CHANNEL NAME"
-      token_file: "token_newchannel.pickle"
-      client_secret_file: "client_secret_newchannel.json"
-```
+This repository currently downloads gameplay footage from YouTube with
+`yt-dlp` and re-uploads edited clips. **Downloading and re-uploading
+third-party footage can infringe copyright or violate YouTube policy.** The
+code deduplicates source IDs, but deduplication is not a license.
 
-2. **Place `client_secret_newchannel.json`** in project root
+- `source_policy.rights_confirmed` defaults to `false` and the engines log a
+  warning on every run.
+- Only publish footage you own, have licensed, or can use under an applicable
+  exception. Consult a qualified professional for your jurisdiction and use
+  case.
+- Background music must also be licensed for monetized use.
+- Titles, thumbnails, and descriptions must not claim that footage is official
+  GTA VI gameplay when it is not.
 
-3. **Authenticate:**
-```bash
-python setup_auth.py --channel newchannel
-```
-
-4. **Run:**
-```bash
-python master_autopilot.py --channel newchannel
-# Or run all:
-python master_autopilot.py --all-channels
-```
+This project does **not** guarantee views, watch time, monetization, or
+copyright safety. It automates publishing mechanics only.
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### "FFmpeg not found"
-```bash
-# Check config.yaml paths.ffmpeg_exe points to valid ffmpeg.exe
-# Or add FFmpeg to system PATH
+### FFmpeg not found
+
+Set `paths.ffmpeg_exe` and `paths.ffprobe_exe` in `config.yaml`, or add the
+FFmpeg `bin` directory to `PATH`. `python doctor.py` prints the resolved paths.
+
+### Quota exceeded or upload blocked
+
+- Check `python upload_video.py --quota`.
+- The general bucket resets at midnight **America/Los_Angeles** by default.
+- Reduce uploads or metadata operations; do not raise the configured limit
+  above Google's actual limit.
+
+### Token cannot update metadata or read Analytics
+
+The current token only has upload/read-only scopes. Re-authenticate:
+
+```powershell
+python setup_auth.py --channel donofvicecity2026
+python upload_video.py --scopes
 ```
 
-### "Quota exceeded"
-- Wait until midnight PST (quota resets)
-- Or reduce daily videos in `config.yaml`
+### Custom thumbnail rejected with 403
 
-### "Token expired / invalid"
-```bash
-python setup_auth.py --channel YOUR_CHANNEL
-```
+YouTube requires channel verification for custom thumbnails. The upload still
+succeeds; the thumbnail step is logged as a warning.
 
-### "No internet" on boot
-- Increase `network.internet_check.max_wait_seconds` in config.yaml
-- Check Windows network profile (Private vs Public)
+### Duplicate run or locked process
 
-### Videos not uploading
-- Check `autopilot.log` for errors
-- Run `python health_check.py -v` for diagnostics
+If a run is interrupted, `autopilot.lock` may remain. The next run checks the
+stored PID and removes a stale lock automatically. If the PID is still alive,
+stop that process first.
 
----
+### No internet at startup
 
-## 📝 License & Credits
-
-- **Music**: NoCopyrightSounds (NCS) — Phonk beats
-- **Footage**: YouTube Creative Commons / Fair Use (gameplay)
-- **Code**: Custom automation pipeline
+Increase `network.internet_check.max_wait_seconds` in `config.yaml`, then
+re-run `python doctor.py`.
 
 ---
 
-## 🤝 Contributing
+## Known limitations
 
-1. Edit `config.yaml` for new topics/schedule
-2. Add topics to `topics.long_video_pool` or `topics.shorts_pool`
-3. Test with `--long-only` or `--shorts-only --slot N`
-4. Run full pipeline with `master_autopilot.py`
+- Custom thumbnails depend on channel verification.
+- Analytics and metadata updates require re-authentication with broader scopes.
+- The AI layer is disabled (`ai.enabled: false`, provider `none`); no API key
+  is required.
+- The current footage pipeline is a compliance risk, not a licensed content
+  library.
+- `run_daily.bat` appends to `autopilot_console.log` without rotation; archive
+  or delete it periodically.
+- The scheduled task and startup entry are unchanged in Phase 3.
 
 ---
 
-**Made with ❤️ for the GTA 6 community — DON OF VICE CITY**
+## License and credits
+
+- Code: custom automation pipeline.
+- Music: use only tracks you have licensed; the bundled file is a local asset,
+  not a license grant.
+- Footage: see [Content and source compliance](#content-and-source-compliance).

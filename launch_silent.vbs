@@ -1,5 +1,5 @@
 ' ============================================================================
-' DON OF VICE CITY — Silent Boot Launcher (VBScript)
+' DON OF VICE CITY - Silent Boot Launcher (VBScript)
 ' Runs run_daily.bat completely hidden (no console window)
 ' Place shortcut in Windows Startup folder: shell:startup
 ' ============================================================================

@@ -1,0 +1,531 @@
+# DON OF VICE CITY — Central Configuration
+# All settings in one place for easy maintenance and multi-channel support
+#
+# This file is local and intentionally ignored by git.  See config.example.yaml
+# for the documented template.
+
+config_version: 2
+
+# ============================================================================
+# CHANNEL CONFIGURATION (Multi-channel ready)
+# ============================================================================
+channels:
+  default: "donofvicecity2026"
+  accounts:
+    donofvicecity2026:
+      name: "DON OF VICE CITY"
+      token_file: "token.pickle"
+      client_secret_file: "client_secret.json"
+      channel_id: ""  # Auto-detected on first auth
+      upload_defaults:
+        category_id: "20"  # Gaming
+        privacy_status: "private"  # For scheduling
+        self_declared_made_for_kids: false
+        language: "en"
+        default_tags:
+          - "gta6"
+          - "gta 6"
+          - "vice city"
+          - "don of vice city"
+          - "gaming"
+          - "ps5 pro"
+          - "rockstar games"
+
+# ============================================================================
+# PATHS & DIRECTORIES
+# ============================================================================
+paths:
+  # Relative paths are resolved from the directory containing this file.
+  base_dir: "."
+  output_dir: "daily_generated"
+  assets_audio: "assets/audio"
+  assets_footage: "assets/footage"
+  db_file: "autopilot_db.json"
+  lock_file: "autopilot.lock"
+  log_file: "autopilot.log"
+  ledger_file: "upload_ledger.json"
+  ffmpeg_exe: ""  # Leave empty to auto-detect from PATH
+  ffprobe_exe: ""  # Auto-detected next to ffmpeg, or from PATH
+
+# ============================================================================
+# VIDEO SPECIFICATIONS
+# ============================================================================
+video:
+  long:
+    resolution: "2560x1440"  # actual long-video output
+    fps: 60
+    duration_range_seconds: [150, 180]  # 2.5 - 3 minutes
+    crf: 18
+    preset: "fast"
+    audio_bitrate: "192k"
+    audio_volume: 0.85
+    color_grading:
+      saturation: 1.12
+      contrast: 1.05
+    watermark:
+      text: "DON OF VICE CITY"
+      color: "cyan"
+      font_size: 42
+      position: "top_right"
+      margin: 50
+
+  short:
+    resolution: "1080x1920"  # 9:16 vertical
+    fps: 60
+    duration_seconds: 26
+    crf: 20
+    preset: "fast"
+    audio_bitrate: "192k"
+    audio_volume: 0.9
+    trim_start_seconds: 2
+    watermark:
+      text: "DON OF VICE CITY"
+      color: "cyan"
+      font_size: 36
+      position: "bottom_center"
+      y_position: 1740
+
+  # Font fallbacks (Windows) - will auto-detect or use system default
+  fonts:
+    primary: "C:/Windows/Fonts/ariblk.ttf"  # Arial Black
+    fallback: "C:/Windows/Fonts/impact.ttf"
+    # If neither found, will use FFmpeg default font
+    allow_default_fallback: true
+
+# ============================================================================
+# DAILY SCHEDULE (IST - India Standard Time)
+# ============================================================================
+schedule:
+  timezone: "Asia/Kolkata"
+
+  long_video:
+    target_hour: 18  # 6:00 PM
+    target_minute: 0
+    min_lead_minutes: 15  # If past target, schedule at now + 15 min
+    round_to_minutes: 5
+
+  shorts:
+    standard_slots:
+      - slot_id: 1
+        name: "Slot 1 (01:00 PM)"
+        hour: 13
+        minute: 0
+      - slot_id: 2
+        name: "Slot 2 (04:30 PM)"
+        hour: 16
+        minute: 30
+      - slot_id: 3
+        name: "Slot 3 (07:30 PM)"
+        hour: 19
+        minute: 30
+      - slot_id: 4
+        name: "Slot 4 (10:30 PM)"
+        hour: 22
+        minute: 30
+
+    # Dynamic scheduling parameters
+    min_first_lead_minutes: 20
+    end_of_day_hour: 23
+    end_of_day_minute: 30
+    min_spread_hours: 1.5
+    late_night_interval_hours: 2
+    round_schedule_to_minutes: 5
+
+# ============================================================================
+# CONTENT TOPICS POOLS
+# ============================================================================
+topics:
+  long_video_pool:
+    - id_key: "6_star_swat_shootout"
+      search_query: "GTA 6 open world police chase gameplay 4k 60fps ps5 pro"
+      title: "GTA 6 6-Star SWAT Police Shootout & Escape: Insane Vice City Realism! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 6-STAR POLICE PURSUIT"
+      sub_title: "VICE CITY SWAT ASSAULT AND CHASE"
+      chapters:
+        - { time: "0:00", title: "Vice City Bank Heist Breach" }
+        - { time: "0:40", title: "5-Star Police Roadblocks & Spike Strips" }
+        - { time: "1:20", title: "Highway Helicopter Pursuit" }
+        - { time: "2:00", title: "SWAT Gunfight & Tactical Escape" }
+        - { time: "2:40", title: "Final Escape & Safehouse Evade" }
+      tags:
+        - "gta 6"
+        - "gta 6 gameplay"
+        - "gta 6 police chase"
+        - "gta 6 4k"
+        - "vice city"
+        - "rockstar games"
+        - "gta 6 leaks"
+        - "gta vi"
+        - "ps5 pro"
+        - "don of vice city"
+
+    - id_key: "gta6_vs_gta5_evolution"
+      search_query: "GTA 6 vs GTA 5 ULTIMATE Comparison Details Graphics 4K"
+      title: "GTA 6 vs GTA 5: 13 Years of Physics & Graphics Evolution! (1440p 60FPS)"
+      duration_sec: 150
+      intro_title: "GTA 6 VS GTA 5 ULTIMATE COMPARISON"
+      sub_title: "13 YEARS OF DETAIL AND PHYSICS EVOLUTION"
+      chapters:
+        - { time: "0:00", title: "Intro & Vice City Overview" }
+        - { time: "0:30", title: "Vehicle Deformation & Crash Physics" }
+        - { time: "1:00", title: "Ocean Wave & Speedboat Dynamics" }
+        - { time: "1:35", title: "5-Star SWAT Police Pursuit AI" }
+        - { time: "2:10", title: "Ray Tracing, Lighting & Ragdoll" }
+      tags:
+        - "gta 6"
+        - "gta 6 vs gta 5"
+        - "gta 6 graphics"
+        - "gta 6 physics"
+        - "grand theft auto 6"
+        - "vice city"
+        - "gta vi"
+        - "ps5 pro"
+        - "gaming"
+        - "don of vice city"
+
+    - id_key: "florida_npc_details"
+      search_query: "GTA 6 real life Florida crazy moments world details 4k"
+      title: "GTA 6 vs Real Life Florida: Extreme Open World Details & NPC Madness! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 REAL LIFE FLORIDA"
+      sub_title: "EXTREME WORLD DETAILS AND NPC MADNESS"
+      chapters:
+        - { time: "0:00", title: "Vice Beach & Miami Strip Realism" }
+        - { time: "0:45", title: "Everglades Wildlife & Alligator Encounters" }
+        - { time: "1:30", title: "Leonida Keys Highway Dynamics" }
+        - { time: "2:15", title: "Florida Man NPC Chaos in Vice City" }
+      tags:
+        - "gta 6"
+        - "florida"
+        - "gta 6 real life"
+        - "vice city"
+        - "gta vi 4k"
+        - "ps5 pro"
+        - "rockstar games"
+        - "don of vice city"
+
+    - id_key: "supercar_driving_physics"
+      search_query: "GTA 6 supercars high speed driving drifting crashes 4k 60fps"
+      title: "GTA 6 Insane Supercar Driving Physics, Drifting & High Speed Crashes! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 SUPERCAR PHYSICS"
+      sub_title: "HIGH SPEED DRIFTING AND CRASHES"
+      chapters:
+        - { time: "0:00", title: "Vice City Supercar Showcase" }
+        - { time: "0:40", title: "200 MPH Highway Speed Run" }
+        - { time: "1:20", title: "Extreme Drift Physics in Rain" }
+        - { time: "2:00", title: "Soft-Body Vehicle Crash Deformation" }
+      tags:
+        - "gta 6"
+        - "gta 6 cars"
+        - "supercars"
+        - "driving physics"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+  shorts_pool:
+    - category: "supercar_pursuit"
+      search_query: "GTA 6 supercar high speed police pursuit escape 4k 60fps"
+      hook_text: "GTA 6 VICE CITY PURSUIT"
+      bottom_text: "200 MPH HIGH SPEED ESCAPE!"
+      title: "GTA 6 High-Speed Vice City Police Pursuit! 🏎️💨 #shorts #gta6 #gaming"
+      tags:
+        - "gta6"
+        - "vice city"
+        - "supercars"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+        - "police chase"
+
+    - category: "physics_comparison"
+      search_query: "GTA 6 vs GTA 5 Graphics and Physics comparison 4k 60fps"
+      hook_text: "GTA 6 VS GTA 5 PHYSICS"
+      bottom_text: "13 YEARS OF EVOLUTION!"
+      title: "GTA 6 vs GTA 5: 13 Years of Physics Evolution! 🤯🌊 #shorts #gta6 #gta5 #physics"
+      tags:
+        - "gta6"
+        - "gta 6 physics"
+        - "gta 5 vs gta 6"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "driveby_shootout"
+      search_query: "GTA 6 insane police chase shootout 5 star wanted 4k 60fps"
+      hook_text: "GTA 6 5-STAR WANTED!"
+      bottom_text: "LUCIA AND JASON VS SWAT COPS!"
+      title: "GTA 6 5-Star SWAT Police Shootout is INSANE! 🚨🔥 #shorts #gta6 #gaming"
+      tags:
+        - "gta6"
+        - "gta 6 shootout"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+        - "police chase"
+
+    - category: "florida_madness"
+      search_query: "GTA 6 vs real life Florida crazy moments Miami 4k"
+      hook_text: "GTA 6 IS REAL FLORIDA!"
+      bottom_text: "FLORIDA MAN MADNESS IS REAL!"
+      title: "GTA 6 vs Real Life Florida: NPC Madness is REAL! 🐊💀 #shorts #gta6 #florida"
+      tags:
+        - "gta6"
+        - "florida"
+        - "gta 6 crazy"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "bank_heist_action"
+      search_query: "GTA 6 bank robbery heist shootout swat gameplay 4k"
+      hook_text: "GTA 6 HEIST GONE WRONG!"
+      bottom_text: "SWAT TEAM ASSAULT!"
+      title: "GTA 6 Bank Robbery Shootout is Absolute CHAOS! 💥💰 #shorts #gta6 #heist"
+      tags:
+        - "gta6"
+        - "gta 6 heist"
+        - "shootout"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "street_fights"
+      search_query: "GTA 6 NPC fight brawl knockouts euphoria physics 4k"
+      hook_text: "GTA 6 STREET FIGHT KNOCKOUTS!"
+      bottom_text: "BRUTAL RAGDOLL PHYSICS!"
+      title: "GTA 6 Ragdoll Knockout Physics are BRUTAL! 🥊💥 #shorts #gta6 #physics"
+      tags:
+        - "gta6"
+        - "gta 6 fight"
+        - "knockout"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+# ============================================================================
+# AUDIO SETTINGS
+# ============================================================================
+audio:
+  background_tracks:
+    - filename: "phonk_1.mp3"
+      genre: "phonk"
+      description: "High-energy Phonk beat for action scenes"
+  # Future: Add mood-based track selection
+  # mood_tracks:
+  #   chase: ["phonk_1.mp3", "phonk_2.mp3"]
+  #   funny: ["meme_1.mp3", "upbeat_1.mp3"]
+  #   mystery: ["synthwave_1.mp3", "dark_1.mp3"]
+
+# ============================================================================
+# YOUTUBE API QUOTA MANAGEMENT
+# ============================================================================
+# Current documented YouTube Data API model (verify in Google Cloud Console
+# before changing): 100 search.list calls/day, 100 videos.insert calls/day,
+# and 10,000 units/day for all other endpoints. All reset at midnight PT.
+quota:
+  daily_limit: 10000
+  upload_daily_limit: 100
+  search_daily_limit: 100
+  reset_timezone: "America/Los_Angeles"
+  costs:
+    video_upload: 1600       # videos.insert costs 1600 general quota units
+    video_update: 50
+    video_list: 1
+    search_list: 100         # search.list costs 100 units if the API is used
+    thumbnail_set: 50
+  alert_threshold_percent: 80
+  reserve_buffer: 2000
+
+# ============================================================================
+# SOURCE VIDEO DOWNLOAD SETTINGS
+# ============================================================================
+download:
+  search:
+    max_results: 10
+    extract_flat: true
+    noplaylist: true
+  format:
+    long: "bestvideo[height<=1440]+bestaudio/best[height<=1080]/best"
+    short: "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best"
+  merge_output_format:
+    long: "mkv"
+    short: "mp4"
+  trim:
+    long_start_seconds: 5
+    short_start_seconds: 10
+    short_duration_seconds: 35  # Download extra for editing flexibility
+  retries: 10
+  fragment_retries: 10
+  timeout_seconds: 30
+
+# ============================================================================
+# DEDUPLICATION SETTINGS
+# ============================================================================
+deduplication:
+  max_used_source_ids: 1000  # Trim database after this many
+  max_used_long_topics: 20
+  skip_previously_used: true
+
+# ============================================================================
+# NETWORK & RETRY SETTINGS
+# ============================================================================
+network:
+  internet_check:
+    url: "https://www.google.com"
+    timeout_seconds: 5
+    max_wait_seconds: 300
+    retry_interval_seconds: 10
+  upload:
+    chunksize_mb: 4  # For long videos
+    chunksize_mb_short: 2
+    resumable: true
+    max_retries: 3
+    retry_delay_seconds: 30
+
+# ============================================================================
+# STORAGE CLEANUP
+# ============================================================================
+cleanup:
+  max_age_hours: 24
+  delete_patterns:
+    - "*.part"
+    - "*.ytdl"
+    - "*.tmp"
+    - "raw_*"
+  keep_recent_hours: 24
+
+# ============================================================================
+# LOCK FILE (Prevent concurrent runs)
+# ============================================================================
+lock:
+  enabled: true
+  check_pid: true
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  file_enabled: true
+  console_enabled: true
+  max_log_size_mb: 10
+  backup_count: 5
+
+# ============================================================================
+# AUTO THUMBNAIL SETTINGS (AI-generated thumbnails)
+# ============================================================================
+thumbnails:
+  enabled: true
+  generate_for_all: true  # Auto-generate for every video
+  ab_test_variants: 2     # Create 2 variants for A/B testing
+  style: "modern"         # Options: modern, bold, clean
+  brand_color: "cyan"
+  watermark_always: true  # Always show channel watermark
+
+# ============================================================================
+# SMART CONTENT ANALYSIS
+# ============================================================================
+content_analysis:
+  auto_detect_highlights: true  # Use YouTube's highlight detection
+  min_clip_duration: 10         # Minimum highlight clip duration (seconds)
+  max_clips_per_search: 5       # Number of clips to analyze per video
+  motion_threshold: 0.7         # Motion intensity filter (0.0-1.0)
+  audio_peaks: true             # Detect audio peaks for action moments
+
+# ============================================================================
+# INTELLIGENT SCHEDULING
+# ============================================================================
+smart_scheduling:
+  use_analytics: true           # Use past performance data
+  lookback_days: 14             # Days to analyze past performance
+  time_zone: "Asia/Kolkata"
+  adaptive_spread: true         # Adjust spread based on past engagement
+  weekday_boost: true           # Boost weekend content earlier
+
+# ============================================================================
+# ERROR RECOVERY & RETRY
+# ============================================================================
+retry:
+  max_attempts: 3
+  backoff_base: 60            # Base delay in seconds (doubles each retry)
+  retry_on:
+    - "network_error"
+    - "quota_exceeded"
+    - "upload_failed"
+    - "ffmpeg_error"
+  auto_reschedule: true         # Reschedule failed uploads
+  fallback_topic: true          # Use different topic if one fails
+
+# ============================================================================
+# MONETIZATION & COLLABORATIONS
+# ============================================================================
+monetization:
+  enabled: false                # Set true when ready for affiliate links
+  track_affiliate_data: true    # Track link performance
+  product_mentions: []          # List of products to feature
+  affiliate_link_template: "https://amzn.to/XXXXX"  # Your affiliate shortlink
+
+# ============================================================================
+# ZERO-TOUCH DEPLOYMENT
+# ============================================================================
+deployment:
+  mode: "auto"                    # Options: auto, manual, scheduled
+  startup_check: true             # Check if already running on startup
+  health_check_interval: 3600     # Health check every hour (seconds)
+  auto_restart_on_failure: true   # Restart bot if it crashes
+  notification_webhook: ""        # Slack/Discord webhook for alerts
+
+# ============================================================================
+# PUBLISH APPROVAL
+# ============================================================================
+# The current zero-touch workflow uploads as private with publishAt, so YouTube
+# publishes automatically. Set required: true to upload as a private draft and
+# wait for an explicit approval before scheduling or publishing.
+approval:
+  required: false
+  auto_approve: true
+
+# ============================================================================
+# AI CONTENT INTELLIGENCE (optional)
+# ============================================================================
+# Basic mode uses deterministic local templates and needs no API key.
+# Supported providers in later phases: openai_compatible, gemini, anthropic,
+# ollama, none. Never put an API key in this file.
+ai:
+  enabled: false
+  provider: "none"
+  base_url: ""
+  model: ""
+  api_key_env: "OPENAI_API_KEY"
+  temperature: 0.7
+  max_tokens: 1200
+  timeout_seconds: 60
+  cache_enabled: true
+
+# ============================================================================
+# YOUTUBE ANALYTICS (optional; requires re-authentication)
+# ============================================================================
+analytics:
+  enabled: false
+  lookback_days: 28
+  cache_minutes: 60
+  include_shorts: true
+
+# ============================================================================
+# CONTENT SOURCE POLICY
+# ============================================================================
+# IMPORTANT: Publishing third-party footage without permission is not safe.
+# Keep a license record for every source you are allowed to publish. This
+# phase adds the policy fields but does not yet block the existing downloader;
+# the compliance gate will be enforced when the source library is introduced.
+source_policy:
+  enforce_license_manifest: false
+  allow_external_downloads: true
+  rights_confirmed: false
+  manifest_file: "assets/footage/licenses.json"

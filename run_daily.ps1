@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    DON OF VICE CITY — Daily Autopilot Launcher (PowerShell)
+    DON OF VICE CITY - Daily Autopilot Launcher (PowerShell)
     Modern, robust alternative to batch file with better error handling,
     structured logging, and health monitoring.
 
@@ -26,10 +26,16 @@ param(
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-$ProjectDir = "C:\Ajfiles\Youtube"
+$ProjectDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $PythonExe = "C:\Users\Awesh\AppData\Local\Programs\Python\Python312\python.exe"
+if (-not (Test-Path $PythonExe)) {
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCommand) { $PythonExe = $pythonCommand.Source }
+}
 $Script = "master_autopilot.py"
-$LogFile = Join-Path $ProjectDir "autopilot.log"
+# Python writes its own rotating autopilot.log.  Keep launcher messages
+# separate so two processes never write different formats to one file.
+$LogFile = Join-Path $ProjectDir "autopilot_launcher.log"
 $ErrorLogFile = Join-Path $ProjectDir "autopilot_errors.log"
 $HealthFile = Join-Path $ProjectDir "last_run_health.json"
 $BootLogFile = Join-Path $ProjectDir "autopilot_boot.log"
@@ -59,13 +65,13 @@ function Write-Log {
     $entry | Out-File -FilePath $targetFile -Encoding utf8 -Append
 }
 
-function Write-EventLog {
+function Write-AutopilotEventLog {
     param([string]$Message, [string]$Level = "Information")
     try {
         if (-not [System.Diagnostics.EventLog]::SourceExists("DonOfViceCity")) {
             [System.Diagnostics.EventLog]::CreateEventSource("DonOfViceCity", "Application")
         }
-        Write-EventLog -Source "DonOfViceCity" -EventId 1000 -EntryType $Level -Message $Message
+        Write-EventLog -LogName "Application" -Source "DonOfViceCity" -EventId 1000 -EntryType $Level -Message $Message
     } catch {
         # Silently fail if no admin rights
     }
@@ -74,12 +80,13 @@ function Write-EventLog {
 function Test-Prerequisites {
     Write-Log "Checking prerequisites..."
 
-    # Python
-    if (-not (Test-Path $PythonExe)) {
-        Write-Log "Python not found at $PythonExe" "ERROR"
+    # Python: $PythonExe may be a bare command when the preferred path is absent.
+    $pythonCommand = Get-Command $PythonExe -ErrorAction SilentlyContinue
+    if (-not $pythonCommand) {
+        Write-Log "Python not found: $PythonExe" "ERROR"
         return $false
     }
-    Write-Log "Python: $PythonExe" "DEBUG"
+    Write-Log "Python: $($pythonCommand.Source)" "DEBUG"
 
     # Script
     $scriptPath = Join-Path $ProjectDir $Script
@@ -106,8 +113,12 @@ function Test-Prerequisites {
 
 function Get-LastRunHealth {
     if (Test-Path $HealthFile) {
-        $content = Get-Content $HealthFile -Raw
-        return $content | ConvertFrom-Json
+        try {
+            $content = Get-Content $HealthFile -Raw
+            if ($content) { return $content | ConvertFrom-Json }
+        } catch {
+            Write-Log "Could not parse health file: $($_.Exception.Message)" "WARN"
+        }
     }
     return @{}
 }
@@ -121,29 +132,32 @@ function Invoke-Autopilot {
     param([string]$ChannelArg = "")
 
     $scriptPath = Join-Path $ProjectDir $Script
-    $args = @()
+    $pyArgs = @()
 
-    if ($QuotaOnly) { $args += "--quota" }
-    if ($VerifyOnly) { $args += "--verify" }
-    if ($LongOnly) { $args += "--long-only" }
-    if ($ShortsOnly) { $args += "--shorts-only" }
-    if ($AllChannels) { $args += "--all-channels" }
-    if ($ChannelArg) { $args += "--channel", $ChannelArg }
+    if ($QuotaOnly) { $pyArgs += "--quota" }
+    if ($VerifyOnly) { $pyArgs += "--verify" }
+    if ($LongOnly) { $pyArgs += "--long-only" }
+    if ($ShortsOnly) { $pyArgs += "--shorts-only" }
+    if ($AllChannels) { $pyArgs += "--all-channels" }
+    if ($ChannelArg) { $pyArgs += "--channel", $ChannelArg }
 
-    $cmd = & $PythonExe $scriptPath @args
+    # Start-Process receives one argument string. Quote every value so paths
+    # and channel names with spaces survive intact.
+    $quotedArgs = @("`"$scriptPath`"")
+    foreach ($arg in $pyArgs) { $quotedArgs += "`"$arg`"" }
 
-    # Capture output line by line for logging
-    $output = @()
-    $process = Start-Process -FilePath $PythonExe -ArgumentList ($scriptPath + " " + ($args -join " ")) -WorkingDirectory $ProjectDir -RedirectStandardOutput (Join-Path $ProjectDir "temp_stdout.txt") -RedirectStandardError (Join-Path $ProjectDir "temp_stderr.txt") -Wait -PassThru -NoNewWindow
+    $stdoutFile = Join-Path $env:TEMP "autopilot_stdout_$PID.txt"
+    $stderrFile = Join-Path $env:TEMP "autopilot_stderr_$PID.txt"
+    $process = Start-Process -FilePath $PythonExe -ArgumentList ($quotedArgs -join " ") -WorkingDirectory $ProjectDir -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile -Wait -PassThru -NoNewWindow
 
     # Read output files
-    if (Test-Path (Join-Path $ProjectDir "temp_stdout.txt")) {
-        $stdout = Get-Content (Join-Path $ProjectDir "temp_stdout.txt") -Raw
-        Remove-Item (Join-Path $ProjectDir "temp_stdout.txt") -Force
+    if (Test-Path $stdoutFile) {
+        $stdout = Get-Content $stdoutFile -Raw
+        Remove-Item $stdoutFile -Force
     }
-    if (Test-Path (Join-Path $ProjectDir "temp_stderr.txt")) {
-        $stderr = Get-Content (Join-Path $ProjectDir "temp_stderr.txt") -Raw
-        Remove-Item (Join-Path $ProjectDir "temp_stderr.txt") -Force
+    if (Test-Path $stderrFile) {
+        $stderr = Get-Content $stderrFile -Raw
+        Remove-Item $stderrFile -Force
     }
 
     # Log output
@@ -158,9 +172,9 @@ function Invoke-Autopilot {
 # ============================================================================
 try {
     $startTime = Get-Date
-    Write-Log "=" * 60
-    Write-Log "DON OF VICE CITY — DAILY AUTOPILOT STARTED"
-    Write-Log "=" * 60
+    Write-Log ("=" * 60)
+    Write-Log "DON OF VICE CITY - DAILY AUTOPILOT STARTED"
+    Write-Log ("=" * 60)
 
     # Pre-flight
     if (-not (Test-Prerequisites)) {
@@ -170,44 +184,50 @@ try {
     # Health check
     $lastRun = Get-LastRunHealth
     if ($lastRun) {
-        Write-Log "Last run: $($lastRun.timestamp) - $($lastRun.status)"
+        $lastRunTime = if ($lastRun.timestamp) { $lastRun.timestamp } else { $lastRun.last_run }
+        Write-Log "Last run: $lastRunTime - $($lastRun.status)"
     }
 
     # Run autopilot
     $channelToRun = if ($Channel) { $Channel } else { "" }
     $exitCode = Invoke-Autopilot -ChannelArg $channelToRun
+    if ($null -eq $exitCode) { $exitCode = 1 }
 
     $endTime = Get-Date
     $duration = [math]::Round(($endTime - $startTime).TotalSeconds)
 
-    # Health record
-    $health = @{
-        timestamp = $endTime.ToString("yyyy-MM-dd HH:mm:ss")
-        status = if ($exitCode -eq 0) { "SUCCESS" } else { "FAILED" }
-        exitCode = $exitCode
-        durationSeconds = $duration
-        channel = if ($Channel) { $Channel } else { "default" }
+    # Diagnostic-only runs must not overwrite the last full-run health record.
+    $diagnosticOnly = $QuotaOnly -or $VerifyOnly
+    if (-not $diagnosticOnly) {
+        $health = @{
+            timestamp = $endTime.ToString("yyyy-MM-dd HH:mm:ss")
+            status = if ($exitCode -eq 0) { "SUCCESS" } else { "FAILED" }
+            exitCode = $exitCode
+            durationSeconds = $duration
+            channel = if ($Channel) { $Channel } else { "default" }
+            mode = if ($LongOnly) { "long-only" } elseif ($ShortsOnly) { "shorts-only" } elseif ($AllChannels) { "all-channels" } else { "full" }
+        }
+        Save-Health $health
     }
-    Save-Health $health
 
     # Final logging
     if ($exitCode -eq 0) {
         Write-Log "Autopilot completed successfully in ${duration}s" "SUCCESS"
-        Write-EventLog "Daily autopilot completed successfully in ${duration}s" "Information"
+        Write-AutopilotEventLog "Daily autopilot completed successfully in ${duration}s" "Information"
     } else {
         Write-Log "Autopilot FAILED with exit code $exitCode after ${duration}s" "ERROR"
-        Write-EventLog "Daily autopilot FAILED with exit code $exitCode" "Error"
+        Write-AutopilotEventLog "Daily autopilot FAILED with exit code $exitCode" "Error"
     }
 
-    Write-Log "=" * 60
-    Write-Log "DON OF VICE CITY — DAILY AUTOPILOT FINISHED"
-    Write-Log "=" * 60
+    Write-Log ("=" * 60)
+    Write-Log "DON OF VICE CITY - DAILY AUTOPILOT FINISHED"
+    Write-Log ("=" * 60)
 
     exit $exitCode
 
 } catch {
     $errorMsg = $_.Exception.Message
     Write-Log "FATAL ERROR: $errorMsg" "ERROR"
-    Write-EventLog "Autopilot fatal error: $errorMsg" "Error"
+    Write-AutopilotEventLog "Autopilot fatal error: $errorMsg" "Error"
     exit 1
 }

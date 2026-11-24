@@ -15,5 +15,8 @@ requests>=2.34.2
 # Configuration
 PyYAML>=6.0.1
 
+# Timezone database for zoneinfo on Windows
+tzdata>=2024.1
+
 # Optional: For health check script
 # psutil>=5.9.0  # Uncomment if you want disk usage in health_check without shutil

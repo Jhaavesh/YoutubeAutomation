@@ -7,9 +7,13 @@ archive/
 # Local Autopilot Database & Runtime State
 autopilot_db.json
 *.log
+*.lock
 last_run_health.*
 autopilot_boot.log
 autopilot_errors.log
+autopilot_errors.json
+temp_stdout.txt
+temp_stderr.txt
 
 # Configuration (may contain local paths)
 config.yaml

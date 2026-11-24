@@ -1,55 +1,39 @@
 """
 DON OF VICE CITY — OAuth 2.0 Authentication Setup (Multi-Channel)
 Run this once per channel to authenticate and store token.pickle.
+
+Required scopes:
+* youtube.upload          — upload videos
+* youtube.force-ssl       — edit metadata, delete videos, set thumbnails
+* yt-analytics.readonly   — read YouTube Analytics in later phases
+
+The flow uses an ephemeral localhost port and validates the OAuth ``state``
+parameter through google-auth-oauthlib's local server helper.
 """
+from __future__ import annotations
+
 import os
-import sys
 import pickle
-import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import webbrowser
+import sys
+from pathlib import Path
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 # Local imports
-from config_loader import get_config, get_channel_config, ConfigLoader
+from config_loader import get_config, get_channel_config
 
 SCOPES = [
-    'https://www.googleapis.com/auth/youtube.upload',
-    'https://www.googleapis.com/auth/youtube.readonly'
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
-auth_code = None
-
-
-class OAuthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        global auth_code
-        query = urllib.parse.urlparse(self.path).query
-        params = urllib.parse.parse_qs(query)
-
-        if 'code' in params:
-            auth_code = params['code'][0]
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            html = """
-            <html>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background: #0f172a; color: #f8fafc;">
-                <h1 style="color: #22c55e;">Authentication Successful!</h1>
-                <p>Your YouTube channel is now connected.</p>
-                <p>You may close this browser window and return to the terminal.</p>
-            </body>
-            </html>
-            """
-            self.wfile.write(html.encode('utf-8'))
-        else:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Error: No authorization code received.")
-
-    def log_message(self, format, *args):
-        pass
+SCOPE_LABELS = {
+    "https://www.googleapis.com/auth/youtube.upload": "Upload videos",
+    "https://www.googleapis.com/auth/youtube.force-ssl": "Edit metadata / thumbnails / delete",
+    "https://www.googleapis.com/auth/yt-analytics.readonly": "Read YouTube Analytics",
+}
 
 
 def authenticate_channel(channel_key: str) -> bool:
@@ -59,121 +43,146 @@ def authenticate_channel(channel_key: str) -> bool:
     try:
         channel = get_channel_config(channel_key)
     except KeyError:
-        print(f"❌ Channel '{channel_key}' not found in config.yaml")
+        print(f"Channel '{channel_key}' not found in config.yaml")
         print(f"Available channels: {list(cfg.channels.keys())}")
         return False
 
     client_secret_path = channel.client_secret_file
     token_path = channel.token_file
 
-    # Resolve paths relative to project root
     if not os.path.isabs(client_secret_path):
         client_secret_path = os.path.join(cfg.base_dir, client_secret_path)
     if not os.path.isabs(token_path):
         token_path = os.path.join(cfg.base_dir, token_path)
 
     if not os.path.exists(client_secret_path):
-        print(f"❌ client_secret.json not found at: {client_secret_path}")
-        print(f"Please download from Google Cloud Console and place it there.")
-        print(f"Or update config.yaml with correct path.")
+        print(f"client_secret.json not found at: {client_secret_path}")
+        print("Download it from Google Cloud Console and place it there,")
+        print("or update channels.accounts.<key>.client_secret_file in config.yaml.")
         return False
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  YOUTUBE OAUTH 2.0 — {channel.name} ({channel_key})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
+    print("Requested permissions:")
+    for scope in SCOPES:
+        print(f"  - {SCOPE_LABELS.get(scope, scope)}")
+    print()
 
     flow = InstalledAppFlow.from_client_secrets_file(
         client_secret_path,
         scopes=SCOPES,
-        redirect_uri='http://localhost:8080/'
     )
 
-    auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-    print(f"\nOpening authorization page in browser...")
-    print(f"If browser doesn't open, visit:\n{auth_url}\n")
+    try:
+        # port=0 asks the OS for a free port; state is generated and verified
+        # by google-auth-oauthlib's local server helper.
+        creds = flow.run_local_server(
+            host="localhost",
+            port=0,
+            prompt="consent",
+            access_type="offline",
+            include_granted_scopes="true",
+            open_browser=True,
+            authorization_prompt_message=(
+                "Open this URL to authorize the channel:\n{url}\n"
+            ),
+            success_message=(
+                "Authentication successful. You may close this window and "
+                "return to the terminal."
+            ),
+        )
+    except Exception as exc:
+        print(f"Authentication failed: {exc}")
+        return False
+
+    granted = set(creds.scopes or [])
+    missing = [scope for scope in SCOPES if scope not in granted]
+    if missing:
+        print("\nWARNING: Google did not grant every requested permission:")
+        for scope in missing:
+            print(f"  - {SCOPE_LABELS.get(scope, scope)}")
+        print("Re-run with prompt=consent, or check the Google Cloud OAuth consent screen.")
+    else:
+        print("\nAll required permissions granted.")
+
+    token_dir = Path(token_path).parent
+    token_dir.mkdir(parents=True, exist_ok=True)
+    with open(token_path, "wb") as handle:
+        pickle.dump(creds, handle)
+    print(f"Token saved to: {token_path}")
 
     try:
-        webbrowser.open(auth_url)
-    except Exception:
-        pass
-
-    global auth_code
-    auth_code = None
-
-    server = HTTPServer(('localhost', 8080), OAuthHandler)
-    print("Waiting for callback on http://localhost:8080/ ...")
-    sys.stdout.flush()
-
-    while auth_code is None:
-        server.handle_request()
-
-    print("Authorization code received! Exchanging for tokens...")
-    flow.fetch_token(code=auth_code)
-    creds = flow.credentials
-
-    with open(token_path, 'wb') as f:
-        pickle.dump(creds, f)
-
-    print(f"✅ Token saved to: {token_path}")
-
-    # Verify channel
-    try:
-        youtube = build('youtube', 'v3', credentials=creds)
-        req = youtube.channels().list(part="snippet,statistics", mine=True)
-        res = req.execute()
-        items = res.get('items', [])
+        youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+        request = youtube.channels().list(part="snippet,statistics", mine=True)
+        response = request.execute()
+        items = response.get("items", [])
         if items:
             info = items[0]
-            title = info['snippet']['title']
-            channel_id = info['id']
-            subs = info['statistics'].get('subscriberCount', 'hidden')
-            print(f"\n✅ Connected to: {title}")
-            print(f"   Channel ID: {channel_id}")
-            print(f"   Subscribers: {subs}")
-
-            # Update config with channel_id (optional, for reference)
-            # This would require writing back to config.yaml
+            print(f"\nConnected to: {info['snippet']['title']}")
+            print(f"   Channel ID: {info['id']}")
+            print(
+                "   Subscribers: "
+                f"{info['statistics'].get('subscriberCount', 'hidden')}"
+            )
         else:
-            print("⚠️ Connected but no channel found for this account.")
-    except Exception as e:
-        print(f"Channel verification note: {e}")
+            print("Connected but no channel was found for this account.")
+    except Exception as exc:
+        print(f"Channel verification note: {exc}")
 
-    print(f"\n✅ Authentication complete for {channel.name}!")
+    print(f"\nAuthentication complete for {channel.name}.")
     print(f"You can now run: python master_autopilot.py --channel {channel_key}")
     return True
 
 
-def main():
+def print_scopes() -> None:
+    print("Required OAuth scopes:")
+    for scope in SCOPES:
+        print(f"  - {scope}")
+        print(f"    {SCOPE_LABELS.get(scope, '')}")
+
+
+def main() -> None:
     """CLI entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="YouTube OAuth Setup for DON OF VICE CITY")
-    parser.add_argument('--channel', type=str, help='Channel key to authenticate (from config.yaml)')
-    parser.add_argument('--list', action='store_true', help='List available channels')
-    parser.add_argument('--all', action='store_true', help='Authenticate all channels')
+    parser = argparse.ArgumentParser(
+        description="YouTube OAuth Setup for DON OF VICE CITY"
+    )
+    parser.add_argument("--channel", type=str, help="Channel key to authenticate")
+    parser.add_argument("--list", action="store_true", help="List configured channels")
+    parser.add_argument("--all", action="store_true", help="Authenticate all channels")
+    parser.add_argument("--scopes", action="store_true", help="Show required scopes")
 
     args = parser.parse_args()
-
     cfg = get_config()
+
+    if args.scopes:
+        print_scopes()
+        return
 
     if args.list:
         print("\nConfigured channels:")
-        for key, ch in cfg.channels.items():
+        for key, channel in cfg.channels.items():
             default_marker = " (DEFAULT)" if key == cfg.default_channel else ""
-            token_exists = "✅" if os.path.exists(os.path.join(cfg.base_dir, ch.token_file)) else "❌"
-            print(f"  {key}{default_marker} — {ch.name} [Token: {token_exists}]")
+            token_path = channel.token_file
+            if not os.path.isabs(token_path):
+                token_path = os.path.join(cfg.base_dir, token_path)
+            token_exists = "OK" if os.path.exists(token_path) else "MISSING"
+            print(f"  {key}{default_marker} — {channel.name} [Token: {token_exists}]")
         return
 
     if args.all:
         print(f"Authenticating all {len(cfg.channels)} channels...")
-        for key in cfg.channels.keys():
-            authenticate_channel(key)
-        return
+        failures = 0
+        for key in cfg.channels:
+            if not authenticate_channel(key):
+                failures += 1
+        sys.exit(1 if failures else 0)
 
-    # Default: authenticate default channel or specified channel
     channel_key = args.channel or cfg.default_channel
-    authenticate_channel(channel_key)
+    sys.exit(0 if authenticate_channel(channel_key) else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
