@@ -19,12 +19,14 @@ from utils import (
     format_iso_tz,
     get_drawtext_font,
     get_ffmpeg_exe,
+    load_db,
     load_ledger,
     probe_video,
     record_ledger_entry,
     release_lock,
     resolution_to_filter_size,
     sanitize_drawtext,
+    save_db,
     validate_video_file,
 )
 
@@ -117,6 +119,48 @@ class QuotaTests(unittest.TestCase):
             tracker.add_usage(1, "video_upload", "abc")
             self.assertEqual(tracker.uploads_today, 1)
             self.assertEqual(tracker.used_today, 1)
+
+    def test_quota_usage_persists_to_disk(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = os.path.join(temp_dir, "db.json")
+            db = load_db(db_path)
+            tracker = QuotaTracker(db, db_path=db_path)
+            tracker.add_usage(1600, "video_upload", "vid123")
+
+            reloaded = load_db(db_path)
+            entry = reloaded["quota_usage"][tracker.today]
+            self.assertEqual(entry["used"], 1600)
+            self.assertEqual(entry["uploads"], 1)
+            self.assertEqual(entry["operations"][0]["video_id"], "vid123")
+
+    def test_save_db_merges_existing_quota(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = os.path.join(temp_dir, "db.json")
+            db = load_db(db_path)
+            tracker = QuotaTracker(db, db_path=db_path)
+            tracker.add_usage(1600, "video_upload", "vid123")
+
+            stale = load_db(db_path)
+            stale["quota_usage"] = {}
+            stale["used_source_ids"] = ["source-1"]
+            save_db(stale, db_path, lock=False)
+
+            entry = load_db(db_path)["quota_usage"][tracker.today]
+            self.assertEqual(entry["used"], 1600)
+            self.assertEqual(entry["uploads"], 1)
+            self.assertEqual(entry["operations"][0]["video_id"], "vid123")
+
+    def test_save_db_refuses_to_wipe_populated_db(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = os.path.join(temp_dir, "db.json")
+            db = load_db(db_path)
+            db["used_source_ids"] = ["source-1"]
+            save_db(db, db_path, lock=False)
+
+            empty = load_db(db_path)
+            empty["used_source_ids"] = []
+            with self.assertRaises(RuntimeError):
+                save_db(empty, db_path, lock=False)
 
 
 class UploadBodyTests(unittest.TestCase):

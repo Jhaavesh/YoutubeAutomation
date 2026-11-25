@@ -435,14 +435,100 @@ def load_db(db_path: Optional[str] = None) -> Dict[str, Any]:
     return default_db
 
 
+def _merge_quota_usage(
+    existing: Dict[str, Any], incoming: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Union quota entries so stale DB snapshots cannot erase usage."""
+    merged: Dict[str, Any] = {}
+    for day in set(existing or {}) | set(incoming or {}):
+        old_entry = (existing or {}).get(day, {})
+        new_entry = dict((incoming or {}).get(day, {}))
+        operations: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+        for operation in list(old_entry.get("operations", [])) + list(
+            new_entry.get("operations", [])
+        ):
+            key = (
+                operation.get("timestamp"),
+                operation.get("operation"),
+                operation.get("video_id"),
+                operation.get("units"),
+            )
+            operations[key] = operation
+        merged_operations = sorted(
+            operations.values(), key=lambda item: str(item.get("timestamp"))
+        )
+        new_entry["operations"] = merged_operations
+        new_entry["used"] = max(
+            int(old_entry.get("used", 0)),
+            int(new_entry.get("used", 0)),
+            sum(int(item.get("units", 0)) for item in merged_operations),
+        )
+        new_entry["uploads"] = max(
+            int(old_entry.get("uploads", 0)),
+            int(new_entry.get("uploads", 0)),
+            sum(
+                1
+                for item in merged_operations
+                if item.get("operation") == "video_upload"
+            ),
+        )
+        new_entry["searches"] = max(
+            int(old_entry.get("searches", 0)),
+            int(new_entry.get("searches", 0)),
+            sum(
+                1
+                for item in merged_operations
+                if item.get("operation") == "search_list"
+            ),
+        )
+        merged[day] = new_entry
+    return merged
+
+
 def save_db(
     db: Dict[str, Any],
     db_path: Optional[str] = None,
     lock: bool = True,
+    allow_empty: bool = False,
 ) -> None:
-    """Save autopilot database atomically."""
+    """Save autopilot database atomically.
+
+    Quota usage from the file on disk is merged before writing so a stale
+    in-memory snapshot (for example, an engine that loaded the DB before an
+    upload) cannot erase recorded usage.  Unless ``allow_empty`` is set, the
+    write is refused when it would replace a populated DB with empty
+    collections; that guard prevents accidental data loss.
+    """
     cfg = get_config()
     path = db_path or cfg.get_db_path()
+
+    existing: Optional[Dict[str, Any]] = None
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                existing = json.load(handle)
+        except Exception:
+            existing = None
+
+    if isinstance(existing, dict):
+        db["quota_usage"] = _merge_quota_usage(
+            existing.get("quota_usage", {}), db.get("quota_usage", {})
+        )
+        if not allow_empty:
+            important = (
+                "uploaded_videos",
+                "used_source_ids",
+                "daily_long_videos",
+                "scheduled_slots",
+                "used_long_topics",
+            )
+            existing_total = sum(len(existing.get(key) or []) for key in important)
+            new_total = sum(len(db.get(key) or []) for key in important)
+            if existing_total > 0 and new_total == 0:
+                raise RuntimeError(
+                    "Refusing to overwrite a populated DB with empty data; "
+                    "pass allow_empty=True only for an intentional reset"
+                )
 
     max_ids = cfg.deduplication.get('max_used_source_ids', 1000)
     if len(db.get('used_source_ids', [])) > max_ids:
@@ -576,8 +662,15 @@ class QuotaTracker:
     cap.  All limits reset at midnight Pacific Time and stay configurable.
     """
 
-    def __init__(self, db: Dict[str, Any]):
+    def __init__(
+        self,
+        db: Dict[str, Any],
+        db_path: Optional[str] = None,
+        persist: bool = True,
+    ):
         self.db = db
+        self.db_path = db_path
+        self.persist = persist
         cfg = get_config()
         self.cfg = cfg
         try:
@@ -637,7 +730,8 @@ class QuotaTracker:
             'operation': operation,
             'video_id': video_id
         })
-        save_db(self.db)
+        if self.persist:
+            save_db(self.db, self.db_path)
 
     def check_and_warn(self, estimated_additional: int = 0) -> Tuple[bool, str]:
         """Check if the general quota bucket is safe for more operations."""
