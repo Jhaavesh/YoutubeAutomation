@@ -266,6 +266,9 @@ def main() -> None:
     """CLI entry point."""
     import argparse
 
+    # Relative font paths for FFmpeg's drawtext require the project directory.
+    os.chdir(Path(__file__).resolve().parent)
+
     parser = argparse.ArgumentParser(
         description="Continuous Auto-Pilot for DON OF VICE CITY"
     )

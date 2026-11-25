@@ -13,9 +13,9 @@ import yt_dlp
 from config_loader import get_config
 from utils import (
     load_db, save_db, get_ffmpeg_exe, run_ffmpeg, sanitize_drawtext,
-    format_iso_tz, get_timestamp, get_date_key,
+    get_drawtext_font, format_iso_tz, get_timestamp, get_date_key,
     get_audio_track, ensure_output_dirs, cleanup_old_files, now_local,
-    probe_video, setup_logging,
+    probe_video, resolution_to_filter_size, setup_logging,
 )
 from upload_video import upload_long_video
 
@@ -135,7 +135,8 @@ def render_long_video(
     # Sanitize texts
     clean_intro = sanitize_drawtext(intro_title)
     clean_sub = sanitize_drawtext(sub_title)
-    font_arg = font_file
+    font_arg = get_drawtext_font(font_file)
+    output_size = resolution_to_filter_size(video_cfg.long_resolution)
     watermark = video_cfg.long_watermark
 
     # Build filter complex
@@ -143,8 +144,8 @@ def render_long_video(
         # The source was already trimmed by yt-dlp's download_ranges.  Do not
         # trim again here: the old code skipped a second 5 seconds.
         f"[0:v]trim=duration={duration_sec},setpts=PTS-STARTPTS,"
-        f"scale={video_cfg.long_resolution}:force_original_aspect_ratio=decrease,"
-        f"pad={video_cfg.long_resolution}:(ow-iw)/2:(oh-ih)/2,"
+        f"scale={output_size}:force_original_aspect_ratio=decrease,"
+        f"pad={output_size}:(ow-iw)/2:(oh-ih)/2,"
         f"fps={video_cfg.long_fps},"
         f"eq=saturation={video_cfg.long_saturation}:contrast={video_cfg.long_contrast},"
     ]
@@ -229,7 +230,7 @@ def generate_custom_thumbnail(
 
     clean_main = sanitize_drawtext(main_text)
     clean_sub = sanitize_drawtext(sub_text)
-    font_arg = format_drawtext_path(font_file)
+    font_arg = get_drawtext_font(font_file)
 
     # Avoid seeking past the end of a short clip.
     try:

@@ -293,6 +293,31 @@ def validate_video_file(
     return True, "OK", info
 
 
+def resolution_to_filter_size(resolution: str) -> str:
+    """Convert ``2560x1440`` to the ``2560:1440`` form used by pad/crop/scale."""
+    width, separator, height = resolution.lower().partition("x")
+    if not separator or not width.strip() or not height.strip():
+        raise ValueError(f"Invalid resolution '{resolution}'; expected WIDTHxHEIGHT")
+    return f"{width.strip()}:{height.strip()}"
+
+
+def get_drawtext_font(font_path: str) -> str:
+    """Return a colon-free font path for FFmpeg's drawtext filter.
+
+    FFmpeg treats ``:`` as a filter-option separator, so an absolute Windows
+    path such as ``C:/Windows/Fonts/ariblk.ttf`` breaks the filter graph.
+    A path relative to the current working directory avoids the drive colon
+    entirely.  Callers must run from the project directory (the launchers do).
+    """
+    relative = os.path.relpath(font_path, os.getcwd()).replace("\\", "/")
+    if re.match(r"^[A-Za-z]:/", relative):
+        raise ValueError(
+            f"Font '{font_path}' is on a different drive than the project; "
+            "copy it into the project directory instead"
+        )
+    return relative
+
+
 def build_drawtext_filter(
     text: str,
     fontfile: str,

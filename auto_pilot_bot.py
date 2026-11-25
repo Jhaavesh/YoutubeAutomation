@@ -13,9 +13,10 @@ import yt_dlp
 from config_loader import get_config
 from utils import (
     load_db, save_db, get_ffmpeg_exe, run_ffmpeg, sanitize_drawtext,
-    format_iso_tz, format_time_ist, get_timestamp,
+    get_drawtext_font, format_iso_tz, format_time_ist, get_timestamp,
     get_date_key, get_audio_track, ensure_output_dirs, cleanup_old_files,
-    compute_schedule_times, now_local, setup_logging,
+    compute_schedule_times, now_local, resolution_to_filter_size,
+    setup_logging,
 )
 from upload_video import upload_short
 
@@ -115,15 +116,16 @@ def edit_to_vertical_short(
     # Sanitize
     clean_hook = sanitize_drawtext(hook_text)
     clean_bottom = sanitize_drawtext(bottom_text)
-    font_arg = font_file
+    font_arg = get_drawtext_font(font_file)
+    output_size = resolution_to_filter_size(video_cfg.short_resolution)
     watermark = video_cfg.short_watermark
 
     filter_complex = (
         # The download already starts at short_start_seconds.  Do not trim a
         # second time here.
         f"[0:v]trim=duration={video_cfg.short_duration},setpts=PTS-STARTPTS,"
-        f"scale={video_cfg.short_resolution}:force_original_aspect_ratio=increase,"
-        f"crop={video_cfg.short_resolution},fps={video_cfg.short_fps},"
+        f"scale={output_size}:force_original_aspect_ratio=increase,"
+        f"crop={output_size},fps={video_cfg.short_fps},"
         # Hook text (top)
         f"drawtext=fontfile={font_arg}:text='{clean_hook}':fontcolor=white:fontsize=60:borderw=6:bordercolor=black:"
         f"shadowcolor=black@0.6:shadowx=3:shadowy=3:x=(w-text_w)/2:y=180,"

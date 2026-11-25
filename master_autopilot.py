@@ -195,6 +195,9 @@ def main():
     """CLI entry point."""
     import argparse
 
+    # Relative font paths for FFmpeg's drawtext require the project directory.
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
     parser = argparse.ArgumentParser(description="DON OF VICE CITY - Master Autopilot")
     parser.add_argument('--channel', type=str, help='Specific channel key to run')
     parser.add_argument('--all-channels', action='store_true', help='Run for all configured channels')

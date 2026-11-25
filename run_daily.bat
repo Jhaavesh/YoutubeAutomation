@@ -31,6 +31,9 @@ set PYTHONPATH=%PROJECT_DIR%
 :: Channel to run (empty = default from config.yaml)
 set CHANNEL=
 
+:: Optional extra arguments, e.g. run_daily.bat --verify
+set EXTRA_ARGS=%*
+
 :: ============================================================================
 :: Pre-flight checks
 :: ============================================================================
@@ -64,11 +67,10 @@ if not exist "token.pickle" (
 :: Health check - prevent duplicate runs within short interval
 :: ============================================================================
 set CURRENT_TIME=%DATE% %TIME%
-if exist "%HEALTH_CHECK_FILE%" (
-    for /f "usebackq tokens=*" %%a in ("%HEALTH_CHECK_FILE%") do set LAST_RUN=%%a
+set LAST_RUN=
+if exist "%HEALTH_CHECK_FILE%" for /f "usebackq tokens=*" %%a in ("%HEALTH_CHECK_FILE%") do set LAST_RUN=%%a
+if defined LAST_RUN (
     echo [INFO] Last run: %LAST_RUN%
-
-    :: Could add time comparison here if needed
 ) else (
     echo [INFO] First run or health file missing
 )
@@ -88,6 +90,7 @@ echo [INFO] Console log: %CONSOLE_LOG%
 :: Build command
 set CMD="%PYTHON_EXE%" "%PROJECT_DIR%\%SCRIPT%"
 if not "%CHANNEL%"=="" set CMD=%CMD% --channel "%CHANNEL%"
+if not "%EXTRA_ARGS%"=="" set CMD=%CMD% %EXTRA_ARGS%
 
 :: Capture stdout/stderr separately; Python owns autopilot.log.
 %CMD% >> "%CONSOLE_LOG%" 2>&1
@@ -106,16 +109,11 @@ if %EXIT_CODE% equ 0 (
 ) else (
     echo [ERROR] Autopilot failed with exit code %EXIT_CODE% at %END_TIME%
     echo ERROR %EXIT_CODE% %END_TIME% >> "%HEALTH_CHECK_FILE%"
-
-    :: Log error to separate error log for easy debugging
     echo. >> "%ERROR_LOG%"
     echo ========================================= >> "%ERROR_LOG%"
     echo FAILED RUN: %END_TIME% (Exit: %EXIT_CODE%) >> "%ERROR_LOG%"
     echo ========================================= >> "%ERROR_LOG%"
-    tail -n 50 "%CONSOLE_LOG%" >> "%ERROR_LOG%" 2>nul || (
-        :: Fallback if tail not available
-        powershell -Command "Get-Content '%CONSOLE_LOG%' -Tail 50" >> "%ERROR_LOG%" 2>nul
-    )
+    powershell -NoProfile -Command "Get-Content -LiteralPath '%CONSOLE_LOG%' -Tail 50" >> "%ERROR_LOG%" 2>nul
 )
 
 echo [INFO] Run completed. Check %PROJECT_DIR%\autopilot.log for details.

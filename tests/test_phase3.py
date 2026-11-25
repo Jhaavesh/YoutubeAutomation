@@ -17,11 +17,13 @@ from utils import (
     compute_schedule_times,
     find_ledger_entry,
     format_iso_tz,
+    get_drawtext_font,
     get_ffmpeg_exe,
     load_ledger,
     probe_video,
     record_ledger_entry,
     release_lock,
+    resolution_to_filter_size,
     sanitize_drawtext,
     validate_video_file,
 )
@@ -261,6 +263,19 @@ class MediaTests(unittest.TestCase):
             sanitize_drawtext("a:b'c&d%e"),
             "a\\:bcANDde",
         )
+
+    def test_filter_size_uses_colons(self) -> None:
+        self.assertEqual(resolution_to_filter_size("2560x1440"), "2560:1440")
+        self.assertEqual(resolution_to_filter_size("1080x1920"), "1080:1920")
+        with self.assertRaises(ValueError):
+            resolution_to_filter_size("1080")
+
+    def test_drawtext_font_path_has_no_drive_colon(self) -> None:
+        project_root = str(Path(__file__).resolve().parent.parent)
+        with patch("utils.os.getcwd", return_value=project_root):
+            font = get_drawtext_font("C:/Windows/Fonts/ariblk.ttf")
+        self.assertNotIn(":", font)
+        self.assertTrue(font.endswith("ariblk.ttf"))
 
 
 class HealthTests(unittest.TestCase):
