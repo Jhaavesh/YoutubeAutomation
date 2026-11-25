@@ -23,6 +23,38 @@ from upload_video import upload_short
 log = setup_logging("auto_pilot_bot")
 
 
+def _normalise_title(title: str) -> str:
+    """Normalise a title so duplicate detection ignores case/spacing."""
+    return " ".join(str(title or "").strip().lower().split())
+
+
+def get_used_short_titles(db: Dict[str, Any]) -> set:
+    """Return Short titles already used, seeding from upload history once."""
+    used = {
+        _normalise_title(title)
+        for title in db.get("used_short_topics", [])
+        if title
+    }
+    if not used:
+        for item in db.get("uploaded_videos", []):
+            title = item.get("title")
+            if title:
+                used.add(_normalise_title(title))
+    return used
+
+
+def select_available_short_topics(
+    pool: List[Dict[str, Any]], db: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Filter out topics whose exact title has already been uploaded."""
+    used = get_used_short_titles(db)
+    return [
+        topic
+        for topic in pool
+        if _normalise_title(topic.get("title", "")) not in used
+    ]
+
+
 # ============================================================================
 # SOURCE VIDEO DOWNLOAD
 # ============================================================================
@@ -220,8 +252,19 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
         standard_slots=cfg.schedule.shorts_standard_slots
     )
 
-    # Shuffle topics for variety
-    available_topics = list(cfg.shorts_pool)
+    # Seed the used-topic history once, then filter duplicate topics.
+    if not db.get("used_short_topics"):
+        db["used_short_topics"] = sorted(get_used_short_titles(db))
+        save_db(db)
+
+    available_topics = select_available_short_topics(cfg.shorts_pool, db)
+    if not available_topics:
+        log.warning(
+            "All %d Short topics have already been used; skipping to avoid "
+            "duplicate uploads. Add new topics to config.yaml to resume Shorts.",
+            len(cfg.shorts_pool),
+        )
+        return []
     random.shuffle(available_topics)
     bg_audio = get_audio_track()
 
@@ -294,6 +337,7 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
                 "scheduled_for": publish_iso,
                 "date_key": today_key
             })
+            db.setdefault("used_short_topics", []).append(topic["title"])
             save_db(db)
 
             log.info(f"    ✅ SUCCESS: Uploaded {video_id} scheduled for {time_str}")

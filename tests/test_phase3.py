@@ -163,6 +163,35 @@ class QuotaTests(unittest.TestCase):
                 save_db(empty, db_path, lock=False)
 
 
+class ShortDedupeTests(unittest.TestCase):
+    def test_used_topic_is_filtered(self) -> None:
+        from auto_pilot_bot import select_available_short_topics
+
+        pool = [{"title": "Topic A"}, {"title": "Topic B"}]
+        db = {"used_short_topics": ["topic a"]}
+        self.assertEqual(
+            [t["title"] for t in select_available_short_topics(pool, db)],
+            ["Topic B"],
+        )
+
+    def test_history_seeds_used_topics(self) -> None:
+        from auto_pilot_bot import select_available_short_topics
+
+        pool = [{"title": "Topic A"}, {"title": "Topic B"}]
+        db = {"used_short_topics": [], "uploaded_videos": [{"title": "Topic A"}]}
+        self.assertEqual(
+            [t["title"] for t in select_available_short_topics(pool, db)],
+            ["Topic B"],
+        )
+
+    def test_all_topics_used_returns_empty(self) -> None:
+        from auto_pilot_bot import select_available_short_topics
+
+        pool = [{"title": "Topic A"}, {"title": "Topic B"}]
+        db = {"used_short_topics": ["Topic A", "Topic B"]}
+        self.assertEqual(select_available_short_topics(pool, db), [])
+
+
 class UploadBodyTests(unittest.TestCase):
     def test_channel_defaults_are_used(self) -> None:
         fake = ChannelConfig(

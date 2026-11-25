@@ -418,6 +418,7 @@ def load_db(db_path: Optional[str] = None) -> Dict[str, Any]:
         "used_source_ids": [],
         "daily_long_videos": {},
         "used_long_topics": [],
+        "used_short_topics": [],
         "quota_usage": {},
     }
 
@@ -521,6 +522,7 @@ def save_db(
                 "daily_long_videos",
                 "scheduled_slots",
                 "used_long_topics",
+                "used_short_topics",
             )
             existing_total = sum(len(existing.get(key) or []) for key in important)
             new_total = sum(len(db.get(key) or []) for key in important)
