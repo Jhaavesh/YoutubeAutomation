@@ -1133,7 +1133,8 @@ def get_audio_track() -> str:
     cfg = get_config()
     audio_dir = cfg.get_assets_audio_path()
     verified_names = {
-        str(name) for name in (cfg.audio_verified_tracks or [])
+        str(name)
+        for name in (getattr(cfg, "audio_verified_tracks", []) or [])
     }
 
     candidates: List[str] = []
