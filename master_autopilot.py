@@ -24,7 +24,7 @@ from config_loader import get_config
 from utils import (
     load_db, save_db, acquire_lock, release_lock,
     wait_for_internet, cleanup_old_files, get_date_key,
-    setup_logging, run_with_lock
+    is_long_video_day, setup_logging, run_with_lock
 )
 from long_video_engine import build_and_publish_daily_long_video
 from auto_pilot_bot import run_daily_shorts
@@ -40,7 +40,7 @@ def run_master_autopilot(channel_key: Optional[str] = None) -> Dict[str, Any]:
     """
     log.info("=" * 60)
     log.info("  DON OF VICE CITY — MASTER AUTOPILOT LAUNCHER")
-    log.info("  (1 Long 1440p Video + Shorts / Day)")
+    log.info("  (Long-Form + Shorts Automation)")
     log.info("=" * 60)
 
     cfg = get_config()
@@ -79,10 +79,16 @@ def run_master_autopilot(channel_key: Optional[str] = None) -> Dict[str, Any]:
 
     long_video_info = None
     long_error = None
+    long_expected = is_long_video_day()
     if today_key in db.get("daily_long_videos", {}):
         existing = db["daily_long_videos"][today_key]
         log.info(f"Today's Long Video already scheduled: {existing.get('url')}")
         long_video_info = existing
+    elif not long_expected:
+        log.info(
+            "Long video is not scheduled today (configured weekday: %s).",
+            cfg.schedule.long_video_weekday,
+        )
     else:
         try:
             long_video_info = build_and_publish_daily_long_video(channel_key)
@@ -116,9 +122,12 @@ def run_master_autopilot(channel_key: Optional[str] = None) -> Dict[str, Any]:
     # Re-read the DB so "already scheduled" slots count as success.
     db = load_db()
     scheduled_today = db.get("scheduled_slots", {}).get(today_key, [])
-    expected_shorts = len(cfg.schedule.shorts_standard_slots)
+    expected_shorts = min(
+        len(cfg.schedule.shorts_standard_slots),
+        max(1, int(cfg.schedule.shorts_max_per_day)),
+    )
 
-    long_ok = long_video_info is not None
+    long_ok = (not long_expected) or long_video_info is not None
     shorts_ok = len(scheduled_today) >= expected_shorts
     success = long_ok and shorts_ok
 
@@ -234,7 +243,11 @@ def main():
 
     if args.shorts_only:
         run_daily_shorts(args.channel)
-        expected = len(get_config().schedule.shorts_standard_slots)
+        cfg = get_config()
+        expected = min(
+            len(cfg.schedule.shorts_standard_slots),
+            max(1, int(cfg.schedule.shorts_max_per_day)),
+        )
         scheduled = len(
             load_db().get("scheduled_slots", {}).get(get_date_key(), [])
         )

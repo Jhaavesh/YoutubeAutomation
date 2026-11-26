@@ -230,10 +230,29 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
         db["scheduled_slots"][today_key] = []
 
     today_done = db["scheduled_slots"][today_key]
-    pending_slots = [s for s in cfg.schedule.shorts_standard_slots if s["slot_id"] not in today_done]
+    pending_slots = [
+        s for s in cfg.schedule.shorts_standard_slots
+        if s["slot_id"] not in today_done
+    ]
+
+    # A lower cadence protects a young channel from looking like a spam
+    # uploader.  The slot list stays flexible; this only caps how many of the
+    # remaining slots run on a single day.
+    max_shorts = max(1, int(getattr(cfg.schedule, "shorts_max_per_day", 1)))
+    if len(today_done) >= max_shorts:
+        log.info(
+            "Daily Short limit (%s) already reached for %s.",
+            max_shorts,
+            today_key,
+        )
+        return []
+    pending_slots = pending_slots[:max_shorts]
 
     if not pending_slots:
-        log.info(f"All {len(cfg.schedule.shorts_standard_slots)} Shorts for {today_key} already scheduled!")
+        log.info(
+            "Daily Short limit reached or all slots scheduled for %s.",
+            today_key,
+        )
         return []
 
     log.info(f"Pending Shorts: {len(pending_slots)} slot(s)")

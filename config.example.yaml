@@ -103,6 +103,7 @@ schedule:
     target_minute: 0
     min_lead_minutes: 15  # If past target, schedule at now + 15 min
     round_to_minutes: 5
+    weekday: 5  # Saturday (0=Monday); long-form once a week
 
   shorts:
     standard_slots:
@@ -130,6 +131,7 @@ schedule:
     min_spread_hours: 1.5
     late_night_interval_hours: 2
     round_schedule_to_minutes: 5
+    max_per_day: 1  # Safer cadence for a young channel; raise after analytics improve
 
 # ============================================================================
 # CONTENT TOPICS POOLS
@@ -226,6 +228,174 @@ topics:
         - "gta vi"
         - "don of vice city"
 
+    - id_key: "helicopter_pursuit_tour"
+      search_query: "GTA 6 helicopter police chase Vice City skyline 4k 60fps"
+      title: "GTA 6 Helicopter Police Chase: Vice City From Above! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 HELICOPTER PURSUIT"
+      sub_title: "VICE CITY FROM ABOVE"
+      chapters:
+        - { time: "0:00", title: "Skyline Takeoff & Downtown Flyover" }
+        - { time: "0:45", title: "Police Helicopter Pursuit" }
+        - { time: "1:30", title: "Downtown Evasion & Rooftop Pass" }
+        - { time: "2:15", title: "Ocean Escape at Sunset" }
+      tags:
+        - "gta 6"
+        - "gta 6 helicopter"
+        - "gta 6 police chase"
+        - "vice city"
+        - "gta 6 4k"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "motorcycle_highway_stunts"
+      search_query: "GTA 6 motorcycle highway stunts wheelie 4k 60fps"
+      title: "GTA 6 Motorcycle Stunts: 150 MPH Highway Wheelies! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 MOTORCYCLE STUNTS"
+      sub_title: "HIGH SPEED HIGHWAY WHEELIES"
+      chapters:
+        - { time: "0:00", title: "Bike Build & Launch" }
+        - { time: "0:40", title: "Highway Wheelie Run" }
+        - { time: "1:20", title: "Traffic Dodge Chaos" }
+        - { time: "2:00", title: "Bridge Jump Finale" }
+      tags:
+        - "gta 6"
+        - "gta 6 motorcycle"
+        - "gta 6 stunts"
+        - "wheelie"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "ocean_boat_chase"
+      search_query: "GTA 6 boat chase ocean waves 4k 60fps"
+      title: "GTA 6 Boat Chase: Ocean Waves, Police & High Speed Escape! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 OCEAN BOAT CHASE"
+      sub_title: "WAVES, POLICE AND FULL SPEED"
+      chapters:
+        - { time: "0:00", title: "Marina Getaway" }
+        - { time: "0:45", title: "Open Ocean Pursuit" }
+        - { time: "1:30", title: "Wave Physics & Big Jumps" }
+        - { time: "2:15", title: "Island Escape" }
+      tags:
+        - "gta 6"
+        - "gta 6 boat"
+        - "gta 6 ocean"
+        - "police chase"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "nightlife_neon_tour"
+      search_query: "GTA 6 Vice City nightlife neon club 4k 60fps"
+      title: "GTA 6 Vice City Nightlife: Neon Streets & Crazy NPCs! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 VICE CITY NIGHTLIFE"
+      sub_title: "NEON STREETS AND NPC CHAOS"
+      chapters:
+        - { time: "0:00", title: "Sunset to Neon" }
+        - { time: "0:40", title: "Club District Tour" }
+        - { time: "1:20", title: "Street Chaos & Custom Cars" }
+        - { time: "2:00", title: "Late Night Escape" }
+      tags:
+        - "gta 6"
+        - "gta 6 nightlife"
+        - "vice city"
+        - "gta 6 neon"
+        - "gta 6 4k"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "hurricane_storm_physics"
+      search_query: "GTA 6 hurricane storm weather 4k 60fps"
+      title: "GTA 6 Hurricane: Insane Storm Physics & Destruction! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 HURRICANE STORM"
+      sub_title: "EXTREME WEATHER PHYSICS"
+      chapters:
+        - { time: "0:00", title: "Storm Arrives in Vice City" }
+        - { time: "0:45", title: "Flooded Streets & Debris" }
+        - { time: "1:30", title: "Wind Physics & Destruction" }
+        - { time: "2:15", title: "Eye of the Storm" }
+      tags:
+        - "gta 6"
+        - "gta 6 hurricane"
+        - "gta 6 weather"
+        - "storm"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "everglades_wildlife"
+      search_query: "GTA 6 Everglades wildlife alligator 4k 60fps"
+      title: "GTA 6 Everglades: Alligators, Wildlife & Swamp Chaos! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 EVERGLADES WILDLIFE"
+      sub_title: "ALLIGATORS AND SWAMP CHAOS"
+      chapters:
+        - { time: "0:00", title: "Swamp Entry" }
+        - { time: "0:45", title: "Alligator Encounter" }
+        - { time: "1:30", title: "Airboat Chase" }
+        - { time: "2:15", title: "Night in the Everglades" }
+      tags:
+        - "gta 6"
+        - "gta 6 wildlife"
+        - "gta 6 alligator"
+        - "everglades"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "offroad_mud_trucks"
+      search_query: "GTA 6 offroad trucks mud 4k 60fps"
+      title: "GTA 6 Off-Road Mayhem: Trucks, Mud & Extreme Terrain! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 OFF-ROAD MAYHEM"
+      sub_title: "TRUCKS, MUD AND EXTREME TERRAIN"
+      chapters:
+        - { time: "0:00", title: "Truck Build & Prep" }
+        - { time: "0:45", title: "Mud Bogging" }
+        - { time: "1:30", title: "Hill Climb Challenge" }
+        - { time: "2:15", title: "Rollover Recovery" }
+      tags:
+        - "gta 6"
+        - "gta 6 offroad"
+        - "gta 6 trucks"
+        - "mud"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
+    - id_key: "airport_planes_chaos"
+      search_query: "GTA 6 airport plane landing takeoff 4k 60fps"
+      title: "GTA 6 Airport Chaos: Plane Landings, Takeoffs & Near Misses! (1440p 60FPS)"
+      duration_sec: 180
+      intro_title: "GTA 6 AIRPORT CHAOS"
+      sub_title: "PLANES, TAKEOFFS AND NEAR MISSES"
+      chapters:
+        - { time: "0:00", title: "Airport Tour" }
+        - { time: "0:45", title: "Takeoff Sequence" }
+        - { time: "1:30", title: "Landing Challenge" }
+        - { time: "2:15", title: "Runway Chaos" }
+      tags:
+        - "gta 6"
+        - "gta 6 plane"
+        - "gta 6 airport"
+        - "aviation"
+        - "vice city"
+        - "ps5 pro"
+        - "gta vi"
+        - "don of vice city"
+
   shorts_pool:
     - category: "supercar_pursuit"
       search_query: "GTA 6 supercar high speed police pursuit escape 4k 60fps"
@@ -306,19 +476,263 @@ topics:
         - "gaming"
         - "don of vice city"
 
+    - category: "helicopter_escape"
+      search_query: "GTA 6 police helicopter chase spotlight escape 4k 60fps"
+      hook_text: "GTA 6 HELICOPTER ESCAPE"
+      bottom_text: "SPOTLIGHT ON YOU!"
+      title: "GTA 6 Police Helicopter Chase: Can You Escape the Spotlight? 🚁🚨 #shorts #gta6 #gaming"
+      tags:
+        - "gta6"
+        - "gta 6 helicopter"
+        - "police chase"
+        - "vice city"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "motorcycle_stunt"
+      search_query: "GTA 6 motorcycle wheelie stunt highway 4k 60fps"
+      hook_text: "GTA 6 HIGHWAY WHEELIE"
+      bottom_text: "ONE WHEEL AT 150 MPH!"
+      title: "GTA 6 Insane Highway Wheelie & Motorcycle Stunt! 🏍️💨 #shorts #gta6 #stunt"
+      tags:
+        - "gta6"
+        - "gta 6 motorcycle"
+        - "wheelie"
+        - "stunt"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "boat_chase"
+      search_query: "GTA 6 speedboat chase ocean water physics 4k"
+      hook_text: "GTA 6 OCEAN CHASE"
+      bottom_text: "BOATS, WAVES & POLICE!"
+      title: "GTA 6 Speedboat Chase: Ocean Physics Gone WILD! 🚤🌊 #shorts #gta6 #vicecity"
+      tags:
+        - "gta6"
+        - "gta 6 boat"
+        - "ocean"
+        - "police chase"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "nightlife_neon"
+      search_query: "GTA 6 Vice City nightlife neon lights club 4k"
+      hook_text: "GTA 6 AFTER DARK"
+      bottom_text: "VICE CITY NEON NIGHTS!"
+      title: "GTA 6 Vice City Nightlife: Neon Lights & Crazy NPCs! 🌃🔥 #shorts #gta6 #nightlife"
+      tags:
+        - "gta6"
+        - "gta 6 nightlife"
+        - "vice city"
+        - "neon"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "hurricane_weather"
+      search_query: "GTA 6 hurricane storm weather physics 4k"
+      hook_text: "GTA 6 HURRICANE!"
+      bottom_text: "STORM PHYSICS ARE INSANE!"
+      title: "GTA 6 Hurricane Weather: Insane Storm Physics in Vice City! 🌀🌧️ #shorts #gta6 #weather"
+      tags:
+        - "gta6"
+        - "gta 6 hurricane"
+        - "weather"
+        - "storm"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "alligator_wildlife"
+      search_query: "GTA 6 alligator wildlife everglades encounter 4k"
+      hook_text: "GTA 6 WILDLIFE"
+      bottom_text: "ALLIGATOR ENCOUNTER!"
+      title: "GTA 6 Alligator Encounter: Everglades Wildlife is TERRIFYING! 🐊😱 #shorts #gta6 #wildlife"
+      tags:
+        - "gta6"
+        - "gta 6 alligator"
+        - "wildlife"
+        - "everglades"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "offroad_mud"
+      search_query: "GTA 6 offroad truck mud physics 4k 60fps"
+      hook_text: "GTA 6 OFF-ROAD"
+      bottom_text: "MUD, TRUCKS & CHAOS!"
+      title: "GTA 6 Off-Road Trucks: Mud Physics & Extreme Terrain! 🚙💨 #shorts #gta6 #offroad"
+      tags:
+        - "gta6"
+        - "gta 6 offroad"
+        - "trucks"
+        - "mud"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "plane_landing"
+      search_query: "GTA 6 airplane landing airport 4k 60fps"
+      hook_text: "GTA 6 PLANE LANDING"
+      bottom_text: "PERFECT OR CRASH?!"
+      title: "GTA 6 Plane Landing: Smooth or Total DISASTER? ✈️😬 #shorts #gta6 #aviation"
+      tags:
+        - "gta6"
+        - "gta 6 plane"
+        - "airport"
+        - "aviation"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "rooftop_parkour"
+      search_query: "GTA 6 rooftop parkour free running 4k"
+      hook_text: "GTA 6 ROOFTOP RUN"
+      bottom_text: "PARKOUR AT 100 FEET!"
+      title: "GTA 6 Rooftop Parkour: Insane Free Running Stunts! 🏃‍♂️🏙️ #shorts #gta6 #parkour"
+      tags:
+        - "gta6"
+        - "gta 6 parkour"
+        - "rooftop"
+        - "stunts"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "gas_station_explosion"
+      search_query: "GTA 6 gas station explosion chain reaction 4k"
+      hook_text: "GTA 6 CHAIN REACTION"
+      bottom_text: "GAS STATION GOES BOOM!"
+      title: "GTA 6 Gas Station Explosion: Insane Chain Reaction! 💥⛽ #shorts #gta6 #explosion"
+      tags:
+        - "gta6"
+        - "gta 6 explosion"
+        - "chain reaction"
+        - "gas station"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "car_meet_tuning"
+      search_query: "GTA 6 car meet custom tuning neon underglow 4k"
+      hook_text: "GTA 6 CAR MEET"
+      bottom_text: "CUSTOM BUILDS & NEON!"
+      title: "GTA 6 Car Meet: Custom Builds, Neon & Insane Tuning! 🚗✨ #shorts #gta6 #cars"
+      tags:
+        - "gta6"
+        - "gta 6 cars"
+        - "car meet"
+        - "tuning"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "sewer_exploration"
+      search_query: "GTA 6 sewer tunnel exploration hidden area 4k"
+      hook_text: "GTA 6 HIDDEN TUNNELS"
+      bottom_text: "SEWER EXPLORATION!"
+      title: "GTA 6 Hidden Sewer Tunnels: Secret Vice City Area! 🕳️🔦 #shorts #gta6 #explore"
+      tags:
+        - "gta6"
+        - "gta 6 secrets"
+        - "sewer"
+        - "exploration"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "taxi_missions"
+      search_query: "GTA 6 taxi mission funny NPC 4k"
+      hook_text: "GTA 6 TAXI CHAOS"
+      bottom_text: "CRAZIEST FARE EVER!"
+      title: "GTA 6 Taxi Missions: The Craziest Fare in Vice City! 🚕😂 #shorts #gta6 #funny"
+      tags:
+        - "gta6"
+        - "gta 6 taxi"
+        - "funny"
+        - "npc"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "fire_truck_chaos"
+      search_query: "GTA 6 fire truck emergency chaos 4k"
+      hook_text: "GTA 6 FIRE TRUCK"
+      bottom_text: "EMERGENCY CHAOS!"
+      title: "GTA 6 Fire Truck Chaos: Emergency Response Gone Wrong! 🚒🔥 #shorts #gta6 #chaos"
+      tags:
+        - "gta6"
+        - "gta 6 fire truck"
+        - "emergency"
+        - "chaos"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "underwater_shark"
+      search_query: "GTA 6 underwater shark swimming ocean 4k"
+      hook_text: "GTA 6 UNDERWATER"
+      bottom_text: "SHARK ENCOUNTER!"
+      title: "GTA 6 Underwater Shark Encounter: Deep Sea Danger! 🦈🌊 #shorts #gta6 #ocean"
+      tags:
+        - "gta6"
+        - "gta 6 shark"
+        - "underwater"
+        - "ocean"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
+    - category: "character_switch"
+      search_query: "GTA 6 Lucia Jason character switch gameplay 4k"
+      hook_text: "GTA 6 LUCIA & JASON"
+      bottom_text: "CHARACTER SWITCH!"
+      title: "GTA 6 Lucia & Jason: Insane Character Switch Moments! 👥🔥 #shorts #gta6 #lucia"
+      tags:
+        - "gta6"
+        - "gta 6 lucia"
+        - "character switch"
+        - "jason"
+        - "shorts"
+        - "gaming"
+        - "don of vice city"
+
 # ============================================================================
 # AUDIO SETTINGS
 # ============================================================================
 audio:
+  # Only tracks marked license: "original" (or listed in verified_tracks) are
+  # used.  Never re-add phonk_1.mp3: it matched a third-party Content ID claim
+  # for "Infraction - Don't Care".
+  #
+  # These files are generated locally by `python audio_factory.py`.  They are
+  # synthesized from oscillators, contain no third-party samples, and rotate
+  # automatically so every upload does not use the same beat.
   background_tracks:
-    - filename: "phonk_1.mp3"
+    - filename: "original_phonk_1.mp3"
       genre: "phonk"
-      description: "High-energy Phonk beat for action scenes"
+      license: "original"
+      description: "Locally synthesized dark phonk beat (no samples)"
+    - filename: "original_phonk_2.mp3"
+      genre: "phonk"
+      license: "original"
+      description: "Locally synthesized dark phonk beat (no samples)"
+    - filename: "original_phonk_3.mp3"
+      genre: "phonk"
+      license: "original"
+      description: "Locally synthesized dark phonk beat (no samples)"
+  verified_tracks:
+    - "original_phonk_1.mp3"
+    - "original_phonk_2.mp3"
+    - "original_phonk_3.mp3"
   # Future: Add mood-based track selection
   # mood_tracks:
-  #   chase: ["phonk_1.mp3", "phonk_2.mp3"]
-  #   funny: ["meme_1.mp3", "upbeat_1.mp3"]
-  #   mystery: ["synthwave_1.mp3", "dark_1.mp3"]
+  #   chase: ["original_phonk_1.mp3", "original_phonk_2.mp3"]
+  #   funny: ["original_phonk_3.mp3"]
+  #   mystery: ["original_phonk_2.mp3"]
 
 # ============================================================================
 # YOUTUBE API QUOTA MANAGEMENT

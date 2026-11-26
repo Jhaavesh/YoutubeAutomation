@@ -88,6 +88,7 @@ class ScheduleConfig:
     long_video_minute: int = 0
     long_min_lead_minutes: int = 15
     long_round_minutes: int = 5
+    long_video_weekday: Optional[int] = None
 
     shorts_standard_slots: List[Dict[str, Any]] = field(default_factory=list)
     shorts_min_first_lead: int = 20
@@ -96,6 +97,7 @@ class ScheduleConfig:
     shorts_min_spread_hours: float = 1.5
     shorts_late_interval_hours: int = 2
     shorts_round_minutes: int = 5
+    shorts_max_per_day: int = 4
 
 
 @dataclass
@@ -182,6 +184,7 @@ class Config:
 
     # Audio
     audio_tracks: List[Dict[str, Any]] = field(default_factory=list)
+    audio_verified_tracks: List[str] = field(default_factory=list)
 
     # Quota
     quota: QuotaConfig = field(default_factory=QuotaConfig)
@@ -446,12 +449,20 @@ def _build_config(raw: Dict[str, Any], project_root: Path) -> Config:
     sched_raw = _as_dict(raw.get("schedule"))
     long_sched = _as_dict(sched_raw.get("long_video"))
     short_sched = _as_dict(sched_raw.get("shorts"))
+    long_weekday_raw = long_sched.get("weekday")
+    long_video_weekday = (
+        None
+        if long_weekday_raw in (None, "", "null")
+        else int(long_weekday_raw)
+    )
+
     config.schedule = ScheduleConfig(
         timezone=str(sched_raw.get("timezone", "Asia/Kolkata")),
         long_video_hour=int(long_sched.get("target_hour", 18)),
         long_video_minute=int(long_sched.get("target_minute", 0)),
         long_min_lead_minutes=int(long_sched.get("min_lead_minutes", 15)),
         long_round_minutes=int(long_sched.get("round_to_minutes", 5)),
+        long_video_weekday=long_video_weekday,
         shorts_standard_slots=_as_list(short_sched.get("standard_slots")),
         shorts_min_first_lead=int(
             short_sched.get("min_first_lead_minutes", 20)
@@ -467,15 +478,20 @@ def _build_config(raw: Dict[str, Any], project_root: Path) -> Config:
         shorts_round_minutes=int(
             short_sched.get("round_schedule_to_minutes", 5)
         ),
+        shorts_max_per_day=int(short_sched.get("max_per_day", 4)),
     )
 
     # Topics / audio ---------------------------------------------------
     topics_raw = _as_dict(raw.get("topics"))
     config.long_video_pool = _as_list(topics_raw.get("long_video_pool"))
     config.shorts_pool = _as_list(topics_raw.get("shorts_pool"))
-    config.audio_tracks = _as_list(
-        _as_dict(raw.get("audio")).get("background_tracks")
-    )
+    audio_raw = _as_dict(raw.get("audio"))
+    config.audio_tracks = _as_list(audio_raw.get("background_tracks"))
+    config.audio_verified_tracks = [
+        str(name)
+        for name in _as_list(audio_raw.get("verified_tracks"))
+        if name
+    ]
 
     # Quota ------------------------------------------------------------
     quota_raw = _as_dict(raw.get("quota"))
@@ -637,6 +653,15 @@ def _validate_config(config: Config) -> None:
         errors.append("schedule.long_video.target_hour must be 0-23")
     if not 0 <= config.schedule.long_video_minute <= 59:
         errors.append("schedule.long_video.target_minute must be 0-59")
+    if (
+        config.schedule.long_video_weekday is not None
+        and not 0 <= config.schedule.long_video_weekday <= 6
+    ):
+        errors.append(
+            "schedule.long_video.weekday must be 0-6 (0 = Monday) or empty"
+        )
+    if config.schedule.shorts_max_per_day < 1:
+        errors.append("schedule.shorts.max_per_day must be at least 1")
 
     # Audio and topic warnings (not fatal: later phases may use other sources)
     if not config.audio_tracks:

@@ -1,10 +1,13 @@
 """Phase 3 regression tests for the stabilized pipeline."""
 from __future__ import annotations
 
+import array
+import logging
 import os
 import subprocess
 import tempfile
 import unittest
+import wave
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -190,6 +193,91 @@ class ShortDedupeTests(unittest.TestCase):
         pool = [{"title": "Topic A"}, {"title": "Topic B"}]
         db = {"used_short_topics": ["Topic A", "Topic B"]}
         self.assertEqual(select_available_short_topics(pool, db), [])
+
+
+class AudioSafetyTests(unittest.TestCase):
+    def test_unverified_track_is_never_selected(self) -> None:
+        from types import SimpleNamespace
+
+        import utils
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            verified = os.path.join(temp_dir, "original_phonk_9.mp3")
+            unverified = os.path.join(temp_dir, "phonk_1.mp3")
+            Path(verified).write_bytes(b"verified-audio")
+            Path(unverified).write_bytes(b"unverified-audio")
+
+            fake_cfg = SimpleNamespace(
+                audio_tracks=[
+                    {"filename": "phonk_1.mp3", "license": "unknown"},
+                    {
+                        "filename": "original_phonk_9.mp3",
+                        "license": "original",
+                    },
+                ],
+                audio_verified_tracks=[],
+                get_assets_audio_path=lambda *parts: os.path.join(
+                    temp_dir, *parts
+                ),
+            )
+            with patch.object(
+                utils, "get_config", return_value=fake_cfg
+            ), patch.object(
+                utils, "log", return_value=logging.getLogger("test")
+            ):
+                selected = utils.get_audio_track()
+
+            self.assertEqual(selected, verified)
+
+    def test_audio_factory_creates_valid_wav(self) -> None:
+        from audio_factory import synthesize_phonk, write_wav
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "beat.wav")
+            samples = synthesize_phonk(duration=0.5, bpm=140, seed=7)
+            write_wav(path, samples)
+
+            with wave.open(path, "rb") as handle:
+                self.assertEqual(handle.getnchannels(), 1)
+                self.assertEqual(handle.getsampwidth(), 2)
+                self.assertEqual(handle.getframerate(), 44100)
+                self.assertAlmostEqual(
+                    handle.getnframes() / 44100, 0.5, places=2
+                )
+                frames = handle.readframes(handle.getnframes())
+
+            pcm = array.array("h")
+            pcm.frombytes(frames)
+            self.assertGreater(max(abs(value) for value in pcm), 1000)
+
+    def test_example_config_uses_original_audio_only(self) -> None:
+        cfg = load_config("config.example.yaml")
+        self.assertTrue(cfg.audio_verified_tracks)
+        for track in cfg.audio_tracks:
+            self.assertEqual(track.get("license"), "original")
+
+    def test_example_config_has_safer_cadence(self) -> None:
+        cfg = load_config("config.example.yaml")
+        self.assertEqual(cfg.schedule.shorts_max_per_day, 1)
+        self.assertEqual(cfg.schedule.long_video_weekday, 5)
+
+    def test_long_video_weekday_matching(self) -> None:
+        from types import SimpleNamespace
+
+        import utils
+
+        fake_cfg = SimpleNamespace(
+            schedule=SimpleNamespace(long_video_weekday=5)
+        )
+        saturday = datetime(
+            2026, 11, 28, 12, 0, tzinfo=ZoneInfo("Asia/Kolkata")
+        )
+        friday = datetime(
+            2026, 11, 27, 12, 0, tzinfo=ZoneInfo("Asia/Kolkata")
+        )
+        with patch.object(utils, "get_config", return_value=fake_cfg):
+            self.assertTrue(utils.is_long_video_day(saturday))
+            self.assertFalse(utils.is_long_video_day(friday))
 
 
 class UploadBodyTests(unittest.TestCase):
