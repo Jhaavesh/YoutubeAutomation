@@ -229,6 +229,112 @@ class AudioSafetyTests(unittest.TestCase):
 
             self.assertEqual(selected, verified)
 
+    def test_every_track_has_a_valid_mood(self) -> None:
+        from audio_factory import STYLE_PRESETS
+
+        cfg = load_config("config.example.yaml")
+        styles = set()
+        filenames = set()
+        for track in cfg.audio_tracks:
+            filenames.add(track["filename"])
+            style = track.get("style")
+            self.assertIn(style, STYLE_PRESETS)
+            styles.add(style)
+        self.assertEqual(styles, set(STYLE_PRESETS))
+        self.assertEqual(set(cfg.audio_verified_tracks), filenames)
+
+    def test_topic_mood_mapping(self) -> None:
+        import utils
+
+        cases = {
+            "supercar_pursuit": "action",
+            "nightlife_neon": "nightlife",
+            "alligator_wildlife": "tension",
+            "taxi_missions": "fun",
+        }
+        for category, expected in cases.items():
+            self.assertEqual(
+                utils.resolve_audio_style({"category": category}), expected
+            )
+        self.assertEqual(
+            utils.resolve_audio_style({"id_key": "everglades_wildlife"}),
+            "tension",
+        )
+        self.assertEqual(
+            utils.resolve_audio_style({"id_key": "nightlife_neon_tour"}),
+            "nightlife",
+        )
+        self.assertEqual(
+            utils.resolve_audio_style(
+                {"category": "something_new", "audio_style": "fun"}
+            ),
+            "fun",
+        )
+        self.assertEqual(
+            utils.resolve_audio_style({"category": "future_shark_topic"}),
+            "tension",
+        )
+        self.assertEqual(
+            utils.resolve_audio_style({"category": "unknown"}), "action"
+        )
+
+    def test_get_audio_track_respects_requested_style(self) -> None:
+        from types import SimpleNamespace
+
+        import utils
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            action = os.path.join(temp_dir, "original_phonk_1.mp3")
+            nightlife = os.path.join(
+                temp_dir, "original_nightlife_1.mp3"
+            )
+            Path(action).write_bytes(b"action-audio")
+            Path(nightlife).write_bytes(b"nightlife-audio")
+
+            fake_cfg = SimpleNamespace(
+                audio_tracks=[
+                    {
+                        "filename": "original_phonk_1.mp3",
+                        "license": "original",
+                        "style": "action",
+                    },
+                    {
+                        "filename": "original_nightlife_1.mp3",
+                        "license": "original",
+                        "style": "nightlife",
+                    },
+                ],
+                audio_verified_tracks=[],
+                get_assets_audio_path=lambda *parts: os.path.join(
+                    temp_dir, *parts
+                ),
+            )
+            with patch.object(
+                utils, "get_config", return_value=fake_cfg
+            ), patch.object(
+                utils, "log", return_value=logging.getLogger("test")
+            ):
+                selected = utils.get_audio_track("nightlife")
+
+            self.assertEqual(
+                os.path.basename(selected), "original_nightlife_1.mp3"
+            )
+
+    def test_synthesized_styles_are_distinct(self) -> None:
+        from audio_factory import STYLE_PRESETS, synthesize_style
+
+        buffers = {}
+        for style in STYLE_PRESETS:
+            samples = synthesize_style(style, duration=0.4, seed=42)
+            self.assertEqual(len(samples), int(0.4 * 44100))
+            self.assertGreater(max(abs(sample) for sample in samples), 0.05)
+            buffers[style] = samples
+
+        styles = list(buffers)
+        for index, first in enumerate(styles):
+            for second in styles[index + 1:]:
+                self.assertNotEqual(buffers[first], buffers[second])
+
     def test_audio_factory_creates_valid_wav(self) -> None:
         from audio_factory import synthesize_phonk, write_wav
 

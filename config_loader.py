@@ -664,6 +664,10 @@ def _validate_config(config: Config) -> None:
         errors.append("schedule.shorts.max_per_day must be at least 1")
 
     # Audio and topic warnings (not fatal: later phases may use other sources)
+    try:
+        from audio_factory import VALID_STYLES as _VALID_AUDIO_STYLES
+    except Exception:  # pragma: no cover - import guard
+        _VALID_AUDIO_STYLES = ()
     if not config.audio_tracks:
         warnings.append(
             "No background audio tracks configured; renders will fail if a "
@@ -671,13 +675,23 @@ def _validate_config(config: Config) -> None:
         )
     else:
         for track in config.audio_tracks:
-            filename = _as_dict(track).get("filename")
+            track_data = _as_dict(track)
+            filename = track_data.get("filename")
             if not filename:
                 warnings.append("An audio track is missing its filename")
                 continue
             if not Path(config.get_assets_audio_path(str(filename))).is_file():
                 warnings.append(
                     f"Audio track not found: {config.get_assets_audio_path(str(filename))}"
+                )
+            style = str(track_data.get("style") or "").strip().lower()
+            if (
+                _VALID_AUDIO_STYLES
+                and style
+                and style not in _VALID_AUDIO_STYLES
+            ):
+                warnings.append(
+                    f"Audio track '{filename}' has unknown style '{style}'"
                 )
     if not config.long_video_pool:
         warnings.append("topics.long_video_pool is empty")

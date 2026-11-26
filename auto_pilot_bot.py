@@ -14,9 +14,9 @@ from config_loader import get_config
 from utils import (
     load_db, save_db, get_ffmpeg_exe, run_ffmpeg, sanitize_drawtext,
     get_drawtext_font, format_iso_tz, format_time_ist, get_timestamp,
-    get_date_key, get_audio_track, ensure_output_dirs, cleanup_old_files,
-    compute_schedule_times, now_local, resolution_to_filter_size,
-    setup_logging,
+    get_date_key, get_audio_track, resolve_audio_style, ensure_output_dirs,
+    cleanup_old_files, compute_schedule_times, now_local,
+    resolution_to_filter_size, setup_logging,
 )
 from upload_video import upload_short
 
@@ -285,7 +285,6 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
         )
         return []
     random.shuffle(available_topics)
-    bg_audio = get_audio_track()
 
     # Long video URL for cross-promotion
     long_video_url = long_video_info.get('url', f'https://www.youtube.com/@{cfg.default_channel}') if long_video_info else f'https://www.youtube.com/@{cfg.default_channel}'
@@ -319,8 +318,13 @@ def run_daily_shorts(channel_key: Optional[str] = None, long_video_info: Optiona
             if src_id and src_id not in db["used_source_ids"]:
                 db["used_source_ids"].append(src_id)
 
-            # 2. Edit to vertical short
-            log.info("    2/3 Editing 9:16 vertical short with Phonk beat...")
+            # 2. Edit to vertical short with a mood-matched beat
+            audio_style = resolve_audio_style(topic)
+            bg_audio = get_audio_track(audio_style)
+            log.info(
+                "    2/3 Editing 9:16 vertical short with %s beat...",
+                audio_style,
+            )
             edit_to_vertical_short(temp_raw, out_final, topic['hook_text'], topic['bottom_text'], bg_audio)
 
             # 3. Build description with cross-promotion CTA
@@ -426,7 +430,9 @@ def run_single_short(
     publish_iso = format_iso_tz(target_time)
 
     ensure_output_dirs()
-    bg_audio = get_audio_track()
+    audio_style = resolve_audio_style(topic)
+    bg_audio = get_audio_track(audio_style)
+    log.info("Audio mood: %s", audio_style)
 
     long_video_url = long_video_info.get('url', f'https://www.youtube.com/@{cfg.default_channel}') if long_video_info else f'https://www.youtube.com/@{cfg.default_channel}'
     long_video_title = (

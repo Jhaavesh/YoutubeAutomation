@@ -709,30 +709,66 @@ audio:
   # for "Infraction - Don't Care".
   #
   # These files are generated locally by `python audio_factory.py`.  They are
-  # synthesized from oscillators, contain no third-party samples, and rotate
-  # automatically so every upload does not use the same beat.
+  # synthesized from oscillators, contain no third-party samples, and are
+  # selected by topic mood so chases get action energy, nightlife gets a
+  # synthwave groove, wildlife/sewers get suspense, and funny topics get a
+  # bouncy beat.
   background_tracks:
     - filename: "original_phonk_1.mp3"
       genre: "phonk"
+      style: "action"
       license: "original"
-      description: "Locally synthesized dark phonk beat (no samples)"
+      description: "Locally synthesized dark action/phonk beat (no samples)"
     - filename: "original_phonk_2.mp3"
       genre: "phonk"
+      style: "action"
       license: "original"
-      description: "Locally synthesized dark phonk beat (no samples)"
+      description: "Locally synthesized dark action/phonk beat (no samples)"
     - filename: "original_phonk_3.mp3"
       genre: "phonk"
+      style: "action"
       license: "original"
-      description: "Locally synthesized dark phonk beat (no samples)"
+      description: "Locally synthesized dark action/phonk beat (no samples)"
+    - filename: "original_nightlife_1.mp3"
+      genre: "synthwave"
+      style: "nightlife"
+      license: "original"
+      description: "Locally synthesized neon nightlife groove (no samples)"
+    - filename: "original_nightlife_2.mp3"
+      genre: "synthwave"
+      style: "nightlife"
+      license: "original"
+      description: "Locally synthesized neon nightlife groove (no samples)"
+    - filename: "original_tension_1.mp3"
+      genre: "cinematic"
+      style: "tension"
+      license: "original"
+      description: "Locally synthesized suspense drone (no samples)"
+    - filename: "original_tension_2.mp3"
+      genre: "cinematic"
+      style: "tension"
+      license: "original"
+      description: "Locally synthesized suspense drone (no samples)"
+    - filename: "original_fun_1.mp3"
+      genre: "comedy"
+      style: "fun"
+      license: "original"
+      description: "Locally synthesized bouncy comedy beat (no samples)"
+    - filename: "original_fun_2.mp3"
+      genre: "comedy"
+      style: "fun"
+      license: "original"
+      description: "Locally synthesized bouncy comedy beat (no samples)"
   verified_tracks:
     - "original_phonk_1.mp3"
     - "original_phonk_2.mp3"
     - "original_phonk_3.mp3"
-  # Future: Add mood-based track selection
-  # mood_tracks:
-  #   chase: ["original_phonk_1.mp3", "original_phonk_2.mp3"]
-  #   funny: ["original_phonk_3.mp3"]
-  #   mystery: ["original_phonk_2.mp3"]
+    - "original_nightlife_1.mp3"
+    - "original_nightlife_2.mp3"
+    - "original_tension_1.mp3"
+    - "original_tension_2.mp3"
+    - "original_fun_1.mp3"
+    - "original_fun_2.mp3"
 
 # ============================================================================
 # YOUTUBE API QUOTA MANAGEMENT

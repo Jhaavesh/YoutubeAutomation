@@ -14,8 +14,9 @@ from config_loader import get_config
 from utils import (
     load_db, save_db, get_ffmpeg_exe, run_ffmpeg, sanitize_drawtext,
     get_drawtext_font, format_iso_tz, get_timestamp, get_date_key,
-    get_audio_track, ensure_output_dirs, cleanup_old_files, now_local,
-    probe_video, resolution_to_filter_size, setup_logging,
+    get_audio_track, resolve_audio_style, ensure_output_dirs,
+    cleanup_old_files, now_local, probe_video, resolution_to_filter_size,
+    setup_logging,
 )
 from upload_video import upload_long_video
 
@@ -344,7 +345,9 @@ def build_and_publish_daily_long_video(channel_key: Optional[str] = None) -> Dic
     raw_path = cfg.get_output_path(f"raw_long_{timestamp}.mkv")
     final_path = cfg.get_output_path(f"final_long_{timestamp}.mp4")
     thumb_path = cfg.get_output_path(f"thumb_long_{timestamp}.jpg")
-    audio_path = get_audio_track()
+    audio_style = resolve_audio_style(topic)
+    audio_path = get_audio_track(audio_style)
+    log.info("Audio mood: %s", audio_style)
 
     try:
         # 1. Download source
