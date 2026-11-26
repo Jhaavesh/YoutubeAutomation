@@ -26,12 +26,14 @@ from config_loader import get_config, get_channel_config
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.force-ssl",
+    "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
 SCOPE_LABELS = {
     "https://www.googleapis.com/auth/youtube.upload": "Upload videos",
     "https://www.googleapis.com/auth/youtube.force-ssl": "Edit metadata / thumbnails / delete",
+    "https://www.googleapis.com/auth/youtube.readonly": "Read channel data",
     "https://www.googleapis.com/auth/yt-analytics.readonly": "Read YouTube Analytics",
 }
 
