@@ -322,10 +322,25 @@ clip. It does not upload anything.
 ## Windows automation
 
 The current machine uses the task **`DonOfViceCity_DailyShorts`**, which runs
-`run_daily.bat` daily at 13:00. A startup VBS entry can also launch the same
-batch file at login, so overlapping starts are possible. `master_autopilot.py`
-acquires a single-instance lock (`autopilot.lock`); a second process exits
-non-zero instead of producing duplicate videos.
+`run_daily.bat` daily at 13:00 IST. The laptop does **not** need to be on at
+exactly 13:00:
+
+- **Daily trigger:** 13:00 IST.
+- **Logon trigger:** runs 2 minutes after the user logs in. If the laptop was
+  off at 13:00, the day's upload is scheduled as soon as the user logs in.
+- **StartWhenAvailable:** a run missed because the PC was asleep starts when
+  the PC wakes.
+- **Battery:** starting and continuing on battery are both allowed.
+- **Retry:** up to 3 restarts, 10 minutes apart, if a run fails.
+- **Single instance:** `MultipleInstances=IgnoreNew`; `master_autopilot.py`
+  also takes a lock.
+
+Runs are idempotent: if today's Short or long video is already scheduled, the
+next run logs `Daily Short limit ... already reached` and exits without
+uploading a duplicate.
+
+The startup VBS shortcut (`DonOfViceCity_Daily.vbs.disabled`) remains disabled;
+the task's logon trigger replaces it, so only one launcher exists.
 
 Do not change the task or startup entry without an explicit decision.
 
@@ -337,7 +352,8 @@ Do not change the task or startup entry without an explicit decision.
 | `autopilot_launcher.log` | `run_daily.ps1` launcher messages |
 | `autopilot_console.log` | `run_daily.bat` stdout/stderr |
 | `autopilot_errors.log` | Failed batch runs |
-| `last_run_health.json` | Last full-run health record |
+| `last_run_health.txt` | Last batch-launcher run status |
+| `last_run_health.json` | Last PowerShell-launcher health record |
 | `autopilot_db.json` | Runtime state and daily slots |
 | `upload_ledger.json` | File-hash → video-ID deduplication ledger |
 
